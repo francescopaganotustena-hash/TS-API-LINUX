@@ -55,7 +55,7 @@ export interface DocumentDisplayInfo extends DocumentClassification {
 
 type AnyRecord = Record<string, unknown>;
 
-const RESOURCE_ORDER: ExplorerResource[] = ["clienti", "fornitori", "articoli", "ordini", "righeOrdine"];
+const RESOURCE_ORDER: ExplorerResource[] = ["clienti", "fornitori", "articoli", "ordini", "righeOrdine", "destinatari"];
 
 const RESOURCE_LABELS: Record<ExplorerResource, string> = {
   clienti: "Clienti",
@@ -63,6 +63,7 @@ const RESOURCE_LABELS: Record<ExplorerResource, string> = {
   articoli: "Articoli",
   ordini: "Ordini",
   righeOrdine: "Righe Ordine",
+  destinatari: "Destinatari",
 };
 
 const DOCUMENT_CLASS_ORDER: DocumentClassKey[] = ["fatture", "ordini", "ddt", "altriDocumenti"];
@@ -156,6 +157,14 @@ const DETAIL_FIELD_TEMPLATES: Record<ExplorerResource, Array<{ label: string; pa
     { label: "UM", paths: ["um1", "um2", "um"], mono: true },
     { label: "Prezzo", paths: ["prezzo1", "prezzo2", "prezzo"], mono: true },
     { label: "Totale", paths: ["importo", "costotot", "totale"], mono: true },
+  ],
+  destinatari: [
+    { label: "Codice", paths: ["codiceDestinatarioMG", "codice", "id"], mono: true },
+    { label: "Ragione sociale", paths: ["ragioneSociale", "anagrafica.ragioneSociale", "nominativo"] },
+    { label: "Cliente/Fornitore", paths: ["cliFor", "cli_for"], mono: true },
+    { label: "Citta", paths: ["citta", "anagrafica.citta"] },
+    { label: "Indirizzo", paths: ["indirizzo", "anagrafica.indirizzo"] },
+    { label: "Ditta", paths: ["ditta"], mono: true },
   ],
 };
 
@@ -527,6 +536,7 @@ function getResourceCode(resourceType: ExplorerResource, row: AnyRecord): string
     articoli: [["codiceArticoloMG"], ["codice"], ["id"]],
     ordini: [["numdoc"], ["numReg"], ["id"]],
     righeOrdine: [["progrRiga"], ["numReg"], ["codartMg66"], ["id"]],
+    destinatari: [["codiceDestinatarioMG"], ["codice"], ["cliFor"], ["id"]],
   };
 
   for (const paths of candidates[resourceType]) {

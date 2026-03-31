@@ -11,7 +11,7 @@ const GESTIONALE_AUTH_SCOPE = process.env.GESTIONALE_AUTH_SCOPE || "1";
 const MIN_PAGE_SIZE = 100;
 const REMOTE_SAFE_PAGE_SIZE = 50;
 
-export type ResourceType = "clienti" | "fornitori" | "articoli" | "ordini" | "righeOrdine";
+export type ResourceType = "clienti" | "fornitori" | "articoli" | "ordini" | "righeOrdine" | "destinatari";
 
 export interface SearchFieldConfig {
   key: string;
@@ -57,6 +57,7 @@ const RESOURCE_ENTITY_MAP: Record<ResourceType, string> = {
   articoli: "Articolo",
   ordini: "Documento",
   righeOrdine: "RigaDocumento",
+  destinatari: "DestinatarioMG",
 };
 
 const RESOURCE_SEARCH_FIELDS: Record<ResourceType, SearchFieldConfig[]> = {
@@ -159,6 +160,29 @@ const RESOURCE_SEARCH_FIELDS: Record<ResourceType, SearchFieldConfig[]> = {
     { key: "codartMg66", label: "Codice Articolo", placeholder: "es. ART001", comparer: 20, safe: true },
     { key: "descart", label: "Descrizione Riga", placeholder: "es. guarnizione", comparer: 20, safe: true },
   ],
+  destinatari: [
+    { key: "codiceDestinatarioMG", label: "Codice Destinatario", placeholder: "es. 001", comparer: 0, safe: true },
+    { key: "ditta", label: "Ditta", placeholder: "es. 1", comparer: 0, safe: true },
+    { key: "cliFor", label: "Codice Cliente/Fornitore", placeholder: "es. 2", comparer: 0, safe: true },
+    {
+      key: "nome",
+      label: "Nome / Ragione Sociale (esteso)",
+      placeholder: "es. Destinatario",
+      comparer: 20,
+      safe: false,
+      apiFields: ["anagrafica.ragioneSociale", "ragioneSociale"],
+      localPaths: ["anagrafica.ragioneSociale", "ragioneSociale"],
+    },
+    {
+      key: "citta",
+      label: "Citta (esteso)",
+      placeholder: "es. Milano",
+      comparer: 20,
+      safe: false,
+      apiFields: ["anagrafica.citta", "citta"],
+      localPaths: ["anagrafica.citta", "citta"],
+    },
+  ],
 };
 
 const RESOURCE_TABLE_COLUMNS: Record<ResourceType, TableColumnConfig[]> = {
@@ -208,6 +232,14 @@ const RESOURCE_TABLE_COLUMNS: Record<ResourceType, TableColumnConfig[]> = {
     { key: "um1", label: "UM", paths: ["um1", "um2"] },
     { key: "prezzo1", label: "Prezzo", paths: ["prezzo1", "prezzo2"] },
     { key: "importo", label: "Totale", paths: ["importo", "costotot"] },
+  ],
+  destinatari: [
+    { key: "codiceDestinatarioMG", label: "Codice", paths: ["codiceDestinatarioMG"] },
+    { key: "ragioneSociale", label: "Ragione Sociale", paths: ["anagrafica.ragioneSociale", "ragioneSociale"] },
+    { key: "cliFor", label: "Cli/For", paths: ["cliFor"] },
+    { key: "citta", label: "Citta", paths: ["anagrafica.citta", "citta"] },
+    { key: "indirizzo", label: "Indirizzo", paths: ["anagrafica.indirizzo", "indirizzo"] },
+    { key: "ditta", label: "Ditta", paths: ["ditta"] },
   ],
 };
 
@@ -799,6 +831,7 @@ export function getResourceLabel(resourceType: ResourceType): string {
     articoli: "Articoli",
     ordini: "Ordini",
     righeOrdine: "Righe Ordine",
+    destinatari: "Destinatari",
   };
   return labels[resourceType];
 }

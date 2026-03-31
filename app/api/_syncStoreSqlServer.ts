@@ -193,8 +193,44 @@ const RESOURCE_CONFIGS: Record<SyncResource, ResourceConfig> = {
       num_doc: toNullableString(getFirstPathValue(row, "numdoc", "numDoc", "num_doc", "numeroDocumento")),
       tipo_doc: toNullableString(getFirstPathValue(row, "tipodoc", "tipoDoc", "tipo_doc", "tipoDocumento")),
       sez_doc: toNullableString(getFirstPathValue(row, "sezdoc", "sezDoc", "sez_doc", "sezione")),
-      cli_for_fatt: toNullableInt(getFirstPathValue(row, "cliforfatt", "cliForFatt", "cli_for_fatt")),
-      cli_for_dest: toNullableInt(getFirstPathValue(row, "cliForDest", "cli_for_dest")),
+      // FIX: Prioritize clienteFornitoreMG.cliFor over cliForDest/cliForFatt
+      // cliForDest/cliForFatt in raw JSON are often SDI destination codes (e.g. "APO")
+      // not actual customer/supplier codes. clienteFornitoreMG.cliFor contains the real party code.
+      cli_for_fatt: toNullableInt(
+        getFirstPathValue(
+          row,
+          "clienteFornitoreMG.cliFor",
+          "clienteFornitoreMG.cli_for",
+          "clienteFornitoreMG.idCliFor",
+          "clienteFornitoreMG.id",
+          "cliforfatt",
+          "cliForFatt",
+          "cli_for_fatt",
+          "clienteFornitore.cliFor",
+          "clienteFornitore.cli_for",
+          "clienteFornitore.id",
+          "clifor",
+          "cliFor"
+        )
+      ),
+      cli_for_dest: toNullableInt(
+        getFirstPathValue(
+          row,
+          "clienteFornitoreMG.cliFor",
+          "clienteFornitoreMG.cli_for",
+          "clienteFornitoreMG.idCliFor",
+          "clienteFornitoreMG.id",
+          "destinatari.cliFor",
+          "destinatari.codice",
+          "destinatari.cli_for",
+          "destinatario.cliFor",
+          "destinatario.codice",
+          // Only use cliForDest if it's a numeric code (fallback for legacy data)
+          "cliForDest",
+          "cli_for_dest",
+          "clifordest"
+        )
+      ),
       data_doc: toSqlDate(getFirstPathValue(row, "datadoc", "dataDoc", "data_doc") ?? syncTime),
       updated_at: toSqlDate(syncTime),
       raw_json: safeJsonStringify(row),
@@ -518,6 +554,11 @@ function buildResourceFilterDescriptors(resource: SyncResource, filters: Record<
   let idx = 0;
   const nextParam = () => `f${idx++}`;
 
+  // DEBUG: log incoming filters for ordini
+  if (resource === "ordini") {
+    console.debug("[buildResourceFilterDescriptors] ordini filters:", filters);
+  }
+
   const addLike = (column: string, rawValue: string) => {
     const paramName = nextParam();
     descriptors.push({
@@ -576,42 +617,49 @@ function buildResourceFilterDescriptors(resource: SyncResource, filters: Record<
     if (resource === "ordini") {
       const addOrderPartyFilter = (partyCode: string, perspective: "fornitore" | "cliente") => {
         const parsed = Number(partyCode);
-        if (!Number.isFinite(parsed)) return;
         const paramName = nextParam();
-        const normalizedCode = Math.trunc(parsed);
-        const expectedTipoCf = perspective === "fornitore" ? 1 : 0;
-        const clause =
-          perspective === "fornitore"
-            ? `(
-                 (
-                   cli_for_fatt = @${paramName}
-                   OR TRY_CONVERT(BIGINT, JSON_VALUE(raw_json, '$.cliforfatt')) = @${paramName}
-                   OR TRY_CONVERT(BIGINT, JSON_VALUE(raw_json, '$.clienteFornitoreMG.cliFor')) = @${paramName}
-                 )
-                 AND COALESCE(
-                   TRY_CONVERT(INT, JSON_VALUE(raw_json, '$.clienteFornitoreMG.tipoCf')),
-                   TRY_CONVERT(INT, JSON_VALUE(raw_json, '$.clienteFornitoreMG.tipocfCg40')),
-                   ${expectedTipoCf}
-                 ) = ${expectedTipoCf}
-               )`
-            : `(
-                 (
-                   cli_for_dest = @${paramName}
-                   OR TRY_CONVERT(BIGINT, JSON_VALUE(raw_json, '$.cliForDest')) = @${paramName}
-                   OR TRY_CONVERT(BIGINT, JSON_VALUE(raw_json, '$.clienteFornitoreMG.cliFor')) = @${paramName}
-                 )
-                 AND COALESCE(
-                   TRY_CONVERT(INT, JSON_VALUE(raw_json, '$.clienteFornitoreMG.tipoCf')),
-                   TRY_CONVERT(INT, JSON_VALUE(raw_json, '$.clienteFornitoreMG.tipocfCg40')),
-                   ${expectedTipoCf}
-                 ) = ${expectedTipoCf}
-               )`;
 
-        descriptors.push({
-          clause,
-          paramName,
-          value: normalizedCode,
-        });
+        // If code is purely numeric, use INT comparison; otherwise fall back to string.
+        const useIntFilter = Number.isFinite(parsed);
+        const normalizedCode = useIntFilter ? Math.trunc(parsed) : partyCode.trim();
+
+        // FIX: Use INT columns as primary filter, with JSON fallback for data synced before fix
+        // This ensures accurate filtering while handling legacy data where INT columns may be NULL
+        const intColumn = perspective === "fornitore" ? "cli_for_fatt" : "cli_for_dest";
+        
+        // Expanded JSON paths to cover all possible field name variants
+        const jsonPaths = perspective === "fornitore"
+          ? [
+              "cliforfatt", "cliForFatt", "cli_for_fatt",
+              "clienteFornitoreMG.cliFor", "clienteFornitoreMG.cli_for", "clienteFornitoreMG.idCliFor", "clienteFornitoreMG.id",
+              "clienteFornitore.cliFor", "clienteFornitore.cli_for", "clienteFornitore.id",
+              "clifor", "cliFor"
+            ]
+          : [
+              "cliForDest", "clifordest", "cli_for_dest", "cliForDestinatario",
+              "clienteFornitoreMG.cliFor", "clienteFornitoreMG.cli_for", "clienteFornitoreMG.idCliFor", "clienteFornitoreMG.id",
+              "clienteFornitore.cliFor", "clienteFornitore.cli_for", "clienteFornitore.id",
+              "destinatari.cliFor", "destinatari.codice", "destinatari.cli_for",
+              "destinatario.cliFor", "destinatario.codice",
+              "clifor", "cliFor"
+            ];
+        
+        // FIX: Build appropriate clause based on whether code is numeric or string
+        if (useIntFilter) {
+          // Numeric code: use INT column comparison with JSON fallback
+          const jsonConditions = jsonPaths.map(path => 
+            `TRY_CONVERT(BIGINT, JSON_VALUE(raw_json, '$.${path}')) = @${paramName}`
+          ).join(" OR ");
+          const clause = `((${intColumn} = @${paramName}) OR (${intColumn} IS NULL AND (${jsonConditions})))`;
+          descriptors.push({ clause, paramName, value: normalizedCode });
+        } else {
+          // String code: skip INT column comparison, use only JSON string comparison
+          const jsonConditions = jsonPaths.map(path => 
+            `JSON_VALUE(raw_json, '$.${path}') = @${paramName}`
+          ).join(" OR ");
+          const clause = `(${jsonConditions})`;
+          descriptors.push({ clause, paramName, value: normalizedCode });
+        }
       };
 
       if (normalizedKey === "numreg") {
@@ -631,11 +679,49 @@ function buildResourceFilterDescriptors(resource: SyncResource, filters: Record<
         continue;
       }
       if (normalizedKey === "cliforfatt") {
-        addOrderPartyFilter(value, "fornitore");
+        // OPTIMIZATION: Use INT column directly for fast filtering
+        // Fallback to JSON only if INT column is NULL (legacy data)
+        const parsed = Number(value);
+        const paramName = nextParam();
+        if (Number.isFinite(parsed)) {
+          descriptors.push({
+            clause: `(cli_for_fatt = @${paramName} OR (cli_for_fatt IS NULL AND TRY_CONVERT(BIGINT, JSON_VALUE(raw_json, '$.cliforfatt')) = @${paramName}))`,
+            paramName,
+            value: Math.trunc(parsed),
+          });
+        }
         continue;
       }
       if (normalizedKey === "clifordest") {
-        addOrderPartyFilter(value, "cliente");
+        // OPTIMIZATION: Use INT column directly for fast filtering
+        // Fallback to JSON only if INT column is NULL (legacy data)
+        const parsed = Number(value);
+        const paramName = nextParam();
+        if (Number.isFinite(parsed)) {
+          descriptors.push({
+            clause: `(cli_for_dest = @${paramName} OR (cli_for_dest IS NULL AND TRY_CONVERT(BIGINT, JSON_VALUE(raw_json, '$.clienteFornitoreMG.cliFor')) = @${paramName}))`,
+            paramName,
+            value: Math.trunc(parsed),
+          });
+        }
+        continue;
+      }
+      // FIX: Added support for filtering documents by party name (ragione sociale)
+      // This allows searching documents by customer/supplier company name
+      const addOrderPartyNameFilter = (partyName: string) => {
+        const paramName = nextParam();
+        const likeValue = toSqlLikeValue(partyName);
+        // Search in various JSON paths where party name might be stored
+        const clause = `(
+          JSON_VALUE(raw_json, '$.clienteFornitoreMG.anagrafica.ragioneSociale') LIKE @${paramName} OR
+          JSON_VALUE(raw_json, '$.clienteFornitoreMG.ragioneSociale') LIKE @${paramName} OR
+          JSON_VALUE(raw_json, '$.anagrafica.ragioneSociale') LIKE @${paramName} OR
+          JSON_VALUE(raw_json, '$.ragioneSociale') LIKE @${paramName}
+        )`;
+        descriptors.push({ clause, paramName, value: likeValue });
+      };
+      if (normalizedKey === "nomeparty") {
+        addOrderPartyNameFilter(value);
         continue;
       }
     }
@@ -1083,7 +1169,6 @@ export async function queryLocalResource(
   const safePageSize = Math.max(1, Math.floor(pageSize));
   const offset = safePageNumber * safePageSize;
   const tableName = qualifiedName(SQLSERVER_SCHEMA, getTableName(resource));
-  const righeOrdineTableName = qualifiedName(SQLSERVER_SCHEMA, getTableName("righeOrdine"));
   const descriptors = buildResourceFilterDescriptors(resource, filters);
   const whereClause = descriptors.length > 0 ? `WHERE ${descriptors.map((d) => d.clause).join(" AND ")}` : "";
 
@@ -1105,26 +1190,16 @@ export async function queryLocalResource(
 
     const dataSql =
       resource === "ordini"
-        ? `WITH page AS (
-             SELECT row_id, updated_at, raw_json, num_reg, cli_for_fatt, cli_for_dest
-             FROM ${tableName}
-             ${whereClause}
-             ORDER BY row_id
-             OFFSET @offsetRows ROWS FETCH NEXT @fetchRows ROWS ONLY
-           )
-           SELECT
-             page.row_id,
-             page.updated_at,
-             page.raw_json,
-             page.cli_for_fatt,
-             page.cli_for_dest,
-             totals.importo_righe
-           FROM page
-           OUTER APPLY (
-             SELECT SUM(TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(r.raw_json, '$.importo'))) AS importo_righe
-             FROM ${righeOrdineTableName} AS r
-             WHERE r.num_reg = page.num_reg
-           ) AS totals`
+        ? `SELECT
+             row_id,
+             updated_at,
+             raw_json,
+             cli_for_fatt,
+             cli_for_dest
+           FROM ${tableName}
+           ${whereClause}
+           ORDER BY row_id
+           OFFSET @offsetRows ROWS FETCH NEXT @fetchRows ROWS ONLY`
         : `SELECT row_id, updated_at, raw_json
            FROM ${tableName}
            ${whereClause}
@@ -1138,6 +1213,7 @@ export async function queryLocalResource(
     ]);
 
     const total = Number((countResult.recordset?.[0] as Record<string, unknown> | undefined)?.total_count ?? 0);
+
     const rows = (dataResult.recordset ?? []).map((row) => {
       const rec = row as Record<string, unknown>;
       const rawJson = toNullableString(rec.raw_json);
@@ -1147,23 +1223,6 @@ export async function queryLocalResource(
           if (parsed && typeof parsed === "object") {
             const parsedRecord = parsed as Record<string, unknown>;
             if (resource === "ordini") {
-              const computedAmountRaw = rec.importo_righe;
-              const computedAmount =
-                typeof computedAmountRaw === "number"
-                  ? computedAmountRaw
-                  : typeof computedAmountRaw === "string"
-                    ? Number(computedAmountRaw)
-                    : null;
-              if (
-                computedAmount !== null &&
-                Number.isFinite(computedAmount) &&
-                parsedRecord.importo === undefined &&
-                parsedRecord.costotot === undefined &&
-                parsedRecord.totale === undefined &&
-                parsedRecord.amount === undefined
-              ) {
-                parsedRecord.importo = computedAmount;
-              }
               // Inject reliable INT columns so client-side filtering works regardless of raw_json field name variants
               if (rec.cli_for_fatt != null) parsedRecord._cliForFatt = Number(rec.cli_for_fatt);
               if (rec.cli_for_dest != null) parsedRecord._cliForDest = Number(rec.cli_for_dest);

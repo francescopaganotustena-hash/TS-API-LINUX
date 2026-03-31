@@ -84,7 +84,9 @@ function buildSearchFilters(resource: MainResource, rawQuery: string): Record<st
 
   if (resource === "ordini") {
     if (isNumeric) return { numdoc: query };
-    return { tipodoc: query };
+    // FIX: Search by party name instead of document type when searching documents
+    // This allows filtering invoices/orders by customer/supplier company name
+    return { nomeParty: query };
   }
 
   return {};
@@ -255,23 +257,35 @@ function getInitialDocumentClassFolders(parentId: string): TreeNode[] {
   ];
 }
 
-function filterDocsByOwnerCode(rows: Row[], ownerCode: string): Row[] {
-  const wanted = normalizePartyCode(ownerCode);
+function filterDocsByOwnerCode(rows: Row[], ownerCode: string | null | undefined): Row[] {
+  const wanted = normalizePartyCode(ownerCode ?? undefined);
   if (!wanted) return [];
 
+  // NOTE: Prioritize _cliForDest/_cliForFatt (injected INT columns from SQL) over
+  // raw_json variants to avoid mismatches from leading-zero stripping differences.
   return rows.filter((row) => {
     const codeCandidates = [
-      asText(getByPath(row, "_cliForFatt")),
-      asText(getByPath(row, "_cliForDest")),
-      asText(getByPath(row, "clienteFornitoreMG.cliFor")),
-      asText(getByPath(row, "clienteFornitoreMG.idCliFor")),
-      asText(getByPath(row, "cliforfatt")),
-      asText(getByPath(row, "cliForFatt")),
+      // Injected INT columns (reliable, no leading-zero issues)
+      row._cliForDest != null ? String(row._cliForDest) : null,
+      row._cliForFatt != null ? String(row._cliForFatt) : null,
+      // Raw JSON variants - various possible field names
       asText(getByPath(row, "cliForDest")),
+      asText(getByPath(row, "clifordest")),
+      asText(getByPath(row, "cliForFatt")),
+      asText(getByPath(row, "cliforfatt")),
+      asText(getByPath(row, "clienteFornitoreMG.cliFor")),
       asText(getByPath(row, "idCliFor")),
       asText(getByPath(row, "cliFor")),
+      asText(getByPath(row, "clifor")),
+      // Also check nested paths that might contain the code
+      asText(getByPath(row, "anagrafica.cliFor")),
+      asText(getByPath(row, "anagrafica.codice")),
+      asText(getByPath(row, "clienteFornitoreMG.id")),
+      asText(getByPath(row, "clienteFornitoreMG.codice")),
+      asText(getByPath(row, "destinatari.cliFor")),
+      asText(getByPath(row, "destinatari.codice")),
     ];
-    return codeCandidates.some((code) => normalizePartyCode(code) === wanted);
+    return codeCandidates.some((code) => normalizePartyCode(code ?? undefined) === wanted);
   });
 }
 
@@ -379,11 +393,31 @@ function normalizeDocumentNodes(nodes: TreeNode[]): TreeNode[] {
 }
 
 function resolvePartyCode(row: Row): string | undefined {
-  return (
-    asText(getByPath(row, "cliforfatt")) ??
-    asText(getByPath(row, "cliForDest")) ??
-    asText(getByPath(row, "clienteFornitoreMG.cliFor"))
-  );
+  // FIX: Prioritize _cliForFatt/_cliForDest (injected INT columns from SQL) over raw JSON
+  // to avoid showing incorrect party names from string fields like "APO"
+  // Also prioritize cliforfatt over cliForDest for invoices (fatture have supplier in cliForFatt)
+  
+  // Injected INT columns (reliable, from SQL sync)
+  if (row._cliForFatt != null) return String(row._cliForFatt);
+  if (row._cliForDest != null) return String(row._cliForDest);
+  
+  // Raw JSON fields - use cliforfatt first (supplier for invoices)
+  const cliforfatt = asText(getByPath(row, "cliforfatt"));
+  if (cliforfatt) return cliforfatt;
+  
+  const cliForFatt = asText(getByPath(row, "cliForFatt"));
+  if (cliForFatt) return cliForFatt;
+  
+  // Then clienteFornitoreMG.cliFor (the actual party linked to the document)
+  const mgCliFor = asText(getByPath(row, "clienteFornitoreMG.cliFor"));
+  if (mgCliFor) return mgCliFor;
+  
+  // cliForDest is often a destination code string like "APO", not a party code - use with caution
+  // Only return it if it looks like a numeric code
+  const cliForDest = asText(getByPath(row, "cliForDest"));
+  if (cliForDest && /^\d+$/.test(cliForDest)) return cliForDest;
+  
+  return undefined;
 }
 
 function resolvePartyName(row: Row): string | undefined {
@@ -656,7 +690,8 @@ export default function Home() {
   const [loadedDocumentsFor, setLoadedDocumentsFor] = useState<string[]>([]);
   const [loadedDestinatariFor, setLoadedDestinatariFor] = useState<string[]>([]);
   const [loadedRowsFor, setLoadedRowsFor] = useState<string[]>([]);
-  const allOrdersCacheRef = useRef<Row[] | null>(null);
+  // Per-party orders cache: key = normalized ownerCode, value = rows for that party
+  const ordersCacheByParty = useRef<Map<string, Row[]>>(new Map());
   const partyNameByCode = useMemo(() => buildPartyNameIndex(dataByResource), [dataByResource]);
 
   const activeMeta = RESOURCE_META[activeResource];
@@ -778,6 +813,8 @@ export default function Home() {
       setLoadedDocumentsFor([]);
       setLoadedDestinatariFor([]);
       setLoadedRowsFor([]);
+      // Clear per-party orders cache when switching resource tabs
+      ordersCacheByParty.current.clear();
       void loadResource(activeResource, buildSearchFilters(activeResource, searchQuery));
     }, 350);
 
@@ -835,16 +872,17 @@ export default function Home() {
           pageSize: searchContext.pageSize,
         };
         const docsPageSize = 500;
-        const targetedFilters =
+        const targetedFilters: Record<string, string> =
           activeResource === "fornitori"
             ? { cliforfatt: ownerCode }
             : { clifordest: ownerCode };
+
 
         const getTargetedOrders = async (): Promise<Row[]> =>
           fetchAllPages(
             {
               ...baseOrderRequest,
-              filters: targetedFilters,
+              filters: { ...targetedFilters },
               extendedMode: false,
               pageSize: docsPageSize,
             },
@@ -854,26 +892,12 @@ export default function Home() {
         const getTargetedOrdersFirstPage = async (): Promise<Row[]> =>
           fetchLocalRows({
             ...baseOrderRequest,
-            filters: targetedFilters,
+            filters: { ...targetedFilters },
             extendedMode: false,
             pageNumber: 0,
             pageSize: docsPageSize,
           });
 
-        const getAllOrders = async (): Promise<Row[]> => {
-          if (allOrdersCacheRef.current !== null && allOrdersCacheRef.current.length > 0) return allOrdersCacheRef.current;
-          const allDocs = await fetchAllPages(
-            {
-              ...baseOrderRequest,
-              filters: {},
-              extendedMode: false,
-              pageSize: docsPageSize,
-            },
-            searchContext.maxPages
-          );
-          if (allDocs.length > 0) allOrdersCacheRef.current = allDocs;
-          return allDocs;
-        };
 
         let docs: Row[] = [];
         try {
@@ -882,18 +906,18 @@ export default function Home() {
           try {
             docs = await getTargetedOrdersFirstPage();
           } catch {
-            // ignore, fallback to getAllOrders below
-          }
-        }
-        if (docs.length === 0) {
-          try {
-            const allDocs = await getAllOrders();
-            docs = filterDocsByOwnerCode(allDocs, ownerCode);
-          } catch {
             docs = [];
           }
         }
+        // NOTE: removed fallback to getAllOrders() on empty docs.
+        // If a customer has no orders, we show 0, not all orders from cache.
+
+
         docs = dedupeDocs(docs);
+
+        // FIX: Apply client-side filtering to ensure documents belong to the selected owner
+        // This prevents showing invoices/orders from other customers due to API filter mismatches
+        docs = filterDocsByOwnerCode(docs, ownerCode);
 
         const classFolders =
           docs.length > 0
@@ -952,7 +976,15 @@ export default function Home() {
           return patched;
         });
 
-        setExpandedIds((prev) => Array.from(new Set([...prev, partyRootId, groupId, ...collectExpandableIds(classFolders)])));
+        setExpandedIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(partyRootId);
+          newSet.add(groupId);
+          for (const id of collectExpandableIds(classFolders)) {
+            newSet.add(id);
+          }
+          return Array.from(newSet);
+        });
         setLoadedDocumentsFor((prev) => [...prev, partyRootId]);
         return;
       }
@@ -1249,5 +1281,3 @@ export default function Home() {
     </main>
   );
 }
-
-

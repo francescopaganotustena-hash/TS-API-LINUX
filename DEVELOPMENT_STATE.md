@@ -459,6 +459,44 @@ Stato aggiornamento board: 2026-03-28
 - `D-10` Script di avvio robusto `dev:clean`
 - `D-11` Ripristino ricerca fornitori per ragione sociale (campi avanzati sempre visibili + auto extended mode)
 - `D-12` Completato `S1-T1`: drilldown `Ordini -> RigheDocumento` (pulsante `Righe`, pannello dettaglio righe, ricerca `RigaDocumento` via endpoint locale unico `/api/dati` con risorsa tecnica `righeOrdine`)
+- `D-13` Fix filtraggio documenti per cliente (2026-03-31)
+  - Correzione `addOrderPartyFilter()` in `_syncStoreSqlServer.ts`
+  - Gestione corretta codici numerici vs stringa per INT columns
+  - Espansione path JSON per `cliForDest`/`cliforfatt` (20+ varianti)
+  - Aggiunto supporto `destinatari` in `lib/api.ts` e `lib/explorerTree.ts`
+- `D-14` Fix visualizzazione cliente in tabella documenti (2026-03-31)
+  - Problema: Fattura 2/MA mostrava "APO" invece di "MARINCO FZE"
+  - Causa: `cliForDest = "APO"` nel JSON è stringa letterale (codice destinatario SDI), non codice cliente
+  - Fix FRONTEND: `resolvePartyCode()` in `app/page.tsx` ora:
+    - Prioritizza `_cliForFatt` (colonna INT iniettata dal sync SQL)
+    - Usa `clienteFornitoreMG.cliFor` dal JSON
+    - Ignora `cliForDest` se non è codice numerico (`/^\d+$/`)
+  - **Fix SISTEMICO BACKEND**: `app/api/_syncStoreSqlServer.ts` - `normalizeRow` per ordini:
+    - Cambiato ordine path: ora priorizza `clienteFornitoreMG.cliFor` (vero codice cliente/fornitore)
+    - `cliForDest`/`cliForFatt` usati solo come fallback (sono codici SDI, spesso stringhe)
+    - Colonne INT `cli_for_fatt` e `cli_for_dest` ora popolate con valori corretti
+  - **AZIONE RICHIESTA**: Resync completa ordini per applicare fix ai dati esistenti
+    - Vai a `/sync` → Esegui sync ordini
+    - Le colonne INT saranno popolate con i codici cliente/fornitore corretti
+- `D-15` Ottimizzazione query SQL filtraggio documenti (2026-03-31)
+  - **Problema**: Query SQL con `JSON_VALUE` su 20+ path erano estremamente lente (30-90 secondi)
+  - **Soluzione**: Query ottimizzata in `buildResourceFilterDescriptors()`:
+    - Usa colonne INT (`cli_for_fatt`, `cli_for_dest`) direttamente per filtraggio
+    - Fallback JSON solo se colonna INT è NULL (dati legacy prima della fix normalizeRow)
+  - **Risultati**:
+    - Query SQL COUNT: **355ms** (vs 30-90s prima) - 100x più veloce
+    - Query completa (2470 righe JSON): **3.7s** (parsando JSON)
+    - Colonne INT popolate: cli_for_fatt 99% (11232/11291), cli_for_dest 52% (5894/11291)
+  - **File modificato**: `app/api/_syncStoreSqlServer.ts`
+- `D-16` Indici covering e statistiche aggiornate (2026-03-31)
+  - **Ottimizzazioni DB applicate**:
+    - `IX_cache_ordini_cliforfatt_covering` - indice covering su `cli_for_fatt` con INCLUDE
+    - `IX_cache_ordini_clifordest_covering` - indice covering su `cli_for_dest` con INCLUDE
+    - `UPDATE STATISTICS dbo.cache_ordini WITH FULLSCAN` - statistiche aggiornate
+  - **Risultati**:
+    - API response time: **618ms** (vs 744ms prima degli indici covering)
+    - Indici covering evitano "key lookup" alla tabella base
+  - **Nota**: Per ulteriori miglioramenti, eseguire resync completa ordini per popolare 100% colonne INT
 
 ### Regole board
 
