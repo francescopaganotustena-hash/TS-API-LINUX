@@ -26,8 +26,10 @@ export default function ConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -116,6 +118,35 @@ export default function ConfigPage() {
     } catch {
       setMessage({ type: 'error', text: 'Errore durante il reset' });
     }
+  }
+
+  async function handleClearData() {
+    setClearing(true);
+    setMessage(null);
+    
+    try {
+      const response = await fetch('/api/config/clear', { method: 'POST' });
+      const data = await response.json();
+      
+      if (data.success) {
+        setMessage({ type: 'success', text: data.message || 'Dati cancellati con successo' });
+        setShowClearConfirm(false);
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Errore durante la cancellazione' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Errore di connessione durante la cancellazione' });
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  function requestClearConfirmation() {
+    setShowClearConfirm(true);
+  }
+
+  function cancelClearConfirmation() {
+    setShowClearConfirm(false);
   }
 
   if (loading) {
@@ -287,6 +318,69 @@ export default function ConfigPage() {
               </button>
             )}
           </div>
+
+          {/* Sezione cancellazione dati */}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">⚠️ Manutenzione Database</h3>
+            <button
+              onClick={requestClearConfirmation}
+              disabled={clearing}
+              className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              🧹 Cancella Log e Database
+            </button>
+            <p className="mt-2 text-xs text-gray-500">
+              Cancella tutti i log delle sincronizzazioni precedenti e resetta il database SQL Server.
+              <strong className="text-orange-600"> Questa operazione è irreversibile!</strong>
+            </p>
+          </div>
+
+          {/* Modal di doppia conferma */}
+          {showClearConfirm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
+                <h2 className="text-xl font-bold text-red-600 mb-4">⚠️ Conferma Cancellazione</h2>
+                <p className="text-gray-700 mb-4">
+                  Stai per cancellare <strong>tutti i log delle sincronizzazioni</strong> e 
+                  <strong> resettare completamente il database SQL Server</strong>.
+                </p>
+                <p className="text-gray-600 mb-4">
+                  Questa operazione eliminerà:
+                </p>
+                <ul className="text-sm text-gray-600 mb-4 list-disc list-inside">
+                  <li>Tutti i job di sincronizzazione (sync_jobs)</li>
+                  <li>Tutti i dati cache clienti, fornitori, articoli, ordini</li>
+                  <li>I metadati di sincronizzazione</li>
+                </ul>
+                <p className="text-red-600 font-semibold mb-6">
+                  ⚠️ QUESTA OPERAZIONE È IRREVERSIBILE! Procedere?
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={cancelClearConfirmation}
+                    disabled={clearing}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 disabled:opacity-50"
+                  >
+                    ❌ Annulla
+                  </button>
+                  <button
+                    onClick={handleClearData}
+                    disabled={clearing}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {clearing ? (
+                      <>
+                        <span className="animate-spin">⏳</span>
+                        Cancellazione...
+                      </>
+                    ) : (
+                      '✅ Conferma Cancellazione'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Info box */}
           <div className="mt-6 p-4 bg-gray-50 rounded-md border border-gray-200">

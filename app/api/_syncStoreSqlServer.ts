@@ -1345,3 +1345,56 @@ function extractLatestUpdatedAt(rows: Record<string, unknown>[]): string | null 
   }
   return latest;
 }
+
+export async function clearAllSyncData(): Promise<{ deletedJobs: number; deletedRows: number; tablesCleared: string[] }> {
+  await ensureSchema();
+  const connection = await getPool();
+  const sql = getSql();
+
+  const tablesToClear = [
+    "sync_jobs",
+    ...RESOURCE_ORDER.map((r) => getResourceConfig(r).tableName),
+  ];
+
+  let deletedJobs = 0;
+  let deletedRows = 0;
+
+  for (const table of tablesToClear) {
+    const qualifiedTable = qualifiedName(SQLSERVER_SCHEMA, table);
+    const result = await connection.request().query(`DELETE FROM ${qualifiedTable}`);
+    const count = result.rowsAffected?.[0] ?? 0;
+    if (table === "sync_jobs") {
+      deletedJobs = count;
+    } else {
+      deletedRows += count;
+    }
+  }
+
+  // Reset sync_meta
+  await connection.request().query(
+    `UPDATE ${qualifiedName(SQLSERVER_SCHEMA, "sync_meta")}
+     SET last_sync_at = NULL,
+         last_success_at = NULL,
+         last_job_id = NULL,
+         last_status = NULL,
+         message = NULL,
+         updated_at = SYSUTCDATETIME()
+     WHERE id = 1`
+  );
+
+  // Reset sync_resource_meta
+  await connection.request().query(
+    `UPDATE ${qualifiedName(SQLSERVER_SCHEMA, "sync_resource_meta")}
+     SET updated_at = NULL,
+         row_count = 0,
+         updated_on = SYSUTCDATETIME()`
+  );
+
+  clearJobCache();
+
+  return {
+    deletedJobs,
+    deletedRows,
+    tablesCleared: tablesToClear,
+  };
+}
