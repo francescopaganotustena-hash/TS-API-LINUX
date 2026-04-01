@@ -615,53 +615,6 @@ function buildResourceFilterDescriptors(resource: SyncResource, filters: Record<
     }
 
     if (resource === "ordini") {
-      const addOrderPartyFilter = (partyCode: string, perspective: "fornitore" | "cliente") => {
-        const parsed = Number(partyCode);
-        const paramName = nextParam();
-
-        // If code is purely numeric, use INT comparison; otherwise fall back to string.
-        const useIntFilter = Number.isFinite(parsed);
-        const normalizedCode = useIntFilter ? Math.trunc(parsed) : partyCode.trim();
-
-        // FIX: Use INT columns as primary filter, with JSON fallback for data synced before fix
-        // This ensures accurate filtering while handling legacy data where INT columns may be NULL
-        const intColumn = perspective === "fornitore" ? "cli_for_fatt" : "cli_for_dest";
-        
-        // Expanded JSON paths to cover all possible field name variants
-        const jsonPaths = perspective === "fornitore"
-          ? [
-              "cliforfatt", "cliForFatt", "cli_for_fatt",
-              "clienteFornitoreMG.cliFor", "clienteFornitoreMG.cli_for", "clienteFornitoreMG.idCliFor", "clienteFornitoreMG.id",
-              "clienteFornitore.cliFor", "clienteFornitore.cli_for", "clienteFornitore.id",
-              "clifor", "cliFor"
-            ]
-          : [
-              "cliForDest", "clifordest", "cli_for_dest", "cliForDestinatario",
-              "clienteFornitoreMG.cliFor", "clienteFornitoreMG.cli_for", "clienteFornitoreMG.idCliFor", "clienteFornitoreMG.id",
-              "clienteFornitore.cliFor", "clienteFornitore.cli_for", "clienteFornitore.id",
-              "destinatari.cliFor", "destinatari.codice", "destinatari.cli_for",
-              "destinatario.cliFor", "destinatario.codice",
-              "clifor", "cliFor"
-            ];
-        
-        // FIX: Build appropriate clause based on whether code is numeric or string
-        if (useIntFilter) {
-          // Numeric code: use INT column comparison with JSON fallback
-          const jsonConditions = jsonPaths.map(path => 
-            `TRY_CONVERT(BIGINT, JSON_VALUE(raw_json, '$.${path}')) = @${paramName}`
-          ).join(" OR ");
-          const clause = `((${intColumn} = @${paramName}) OR (${intColumn} IS NULL AND (${jsonConditions})))`;
-          descriptors.push({ clause, paramName, value: normalizedCode });
-        } else {
-          // String code: skip INT column comparison, use only JSON string comparison
-          const jsonConditions = jsonPaths.map(path => 
-            `JSON_VALUE(raw_json, '$.${path}') = @${paramName}`
-          ).join(" OR ");
-          const clause = `(${jsonConditions})`;
-          descriptors.push({ clause, paramName, value: normalizedCode });
-        }
-      };
-
       if (normalizedKey === "numreg") {
         addEqInt("num_reg", value);
         continue;

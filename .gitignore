@@ -25,3 +25,6 @@ Thumbs.db
 tsconfig.tsbuildinfo
 node_modules
 .ts-api-sync/
+
+# Config file with API credentials
+data/config.json

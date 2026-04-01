@@ -1,0 +1,747 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "meta": {
+    "title": "TS-API Alyante Web API - Configurazione Principale",
+    "description": "Documentazione unificata per l'integrazione con API Alyante Web API. Include tutte le entità disponibili, operazioni supportate, parametri e esempi pratici.",
+    "version": "1.0.0",
+    "generated": "2026-04-01",
+    "source": "swagger-api.json",
+    "apiInfo": {
+      "title": "Alyante Web API",
+      "description": "Servizio Alyante Web API",
+      "version": "v1"
+    }
+  },
+
+  "connection": {
+    "baseUrl": "http://miorouter.homeip.net:9080/api/v1",
+    "urlStructure": "/v1/{ambiente}/{verticale?}/{Entita}/{id}",
+    "urlPattern": "/v1/{ambiente}/{verticale?}/{Entita}{._op=operation?}",
+    "auth": {
+      "type": "Basic",
+      "headers": {
+        "Authorization": "Basic <base64(username:password)>",
+        "Authorization-Scope": "1",
+        "Content-Type": "application/json"
+      },
+      "description": "Autenticazione Basic Auth con header Authorization-Scope aggiuntivo per definire lo scope di autorizzazione"
+    }
+  },
+
+  "parameters": {
+    "ambiente": {
+      "type": "string",
+      "default": "1",
+      "description": "L'ambiente di lavoro",
+      "required": true,
+      "position": "path"
+    },
+    "verticale": {
+      "type": "string",
+      "default": null,
+      "description": "Il verticale di lavoro (opzionale)",
+      "required": false,
+      "position": "path"
+    },
+    "id": {
+      "type": "string",
+      "description": "L'id dell'oggetto da recuperare/aggiornare/eliminare",
+      "required": true,
+      "position": "path"
+    },
+    "_op": {
+      "type": "string",
+      "enum": ["search", "validate", "validateproperties", "approve", "getbyid_polyedro", "verifica_movimentazione_progressivi", "searchlistino", "ricalcologiacenza", "ricalcoloprezzi", "checkLicense", "defaultpath", "defaultmedia", "allpaths", "allmedias"],
+      "description": "Operazione da eseguire (query parameter)",
+      "required": false,
+      "position": "query"
+    },
+    "force": {
+      "type": "integer",
+      "description": "Codice errore da ignorare (separati da virgola per multipli)",
+      "required": false,
+      "position": "query"
+    }
+  },
+
+  "searchParameters": {
+    "pageNumber": {
+      "type": "integer",
+      "default": 0,
+      "description": "Numero di pagina (ZERO-BASED! La prima pagina è 0)"
+    },
+    "pageSize": {
+      "type": "integer",
+      "default": 100,
+      "description": "Dimensione pagina (minimo consigliato: 100)"
+    },
+    "items": {
+      "type": "array",
+      "description": "Array di filtri di ricerca",
+      "items": {
+        "type": "object",
+        "properties": {
+          "propertyName": {
+            "type": "string",
+            "description": "Nome della proprietà su cui filtrare"
+          },
+          "value": {
+            "type": "string",
+            "description": "Valore da confrontare"
+          },
+          "comparer": {
+            "type": "integer",
+            "description": "Tipo di confronto (0=uguale, ecc.)"
+          },
+          "operator": {
+            "type": "integer",
+            "description": "Operatore logico (1=AND, 2=OR)"
+          }
+        }
+      }
+    }
+  },
+
+  "operations": {
+    "getById": {
+      "method": "GET",
+      "url": "/v1/{ambiente}/{verticale?}/{Entita}/{id}",
+      "description": "Recupera un oggetto per ID",
+      "responseCodes": {
+        "200": "Oggetto trovato",
+        "404": "Oggetto non trovato"
+      }
+    },
+    "search": {
+      "method": "POST",
+      "url": "/v1/{ambiente}/{verticale?}/{Entita}?_op=search",
+      "description": "Ricerca libera tra gli oggetti",
+      "requestBody": "SearchGroupDTO",
+      "responseCodes": {
+        "200": "Lista di oggetti trovati",
+        "400": "Filtro di ricerca non specificato"
+      }
+    },
+    "create": {
+      "method": "POST",
+      "url": "/v1/{ambiente}/{verticale?}/{Entita}",
+      "description": "Crea un nuovo oggetto",
+      "requestBody": "EntityDTO",
+      "responseCodes": {
+        "201": "Oggetto creato correttamente",
+        "400": "Errore di validazione",
+        "409": "Violazione logica di business"
+      }
+    },
+    "update": {
+      "method": "PUT",
+      "url": "/v1/{ambiente}/{verticale?}/{Entita}/{id}",
+      "description": "Aggiorna un oggetto esistente",
+      "requestBody": "EntityDTO",
+      "responseCodes": {
+        "200": "Oggetto aggiornato",
+        "400": "Errore di validazione",
+        "404": "Oggetto non trovato",
+        "409": "Violazione logica di business"
+      }
+    },
+    "delete": {
+      "method": "DELETE",
+      "url": "/v1/{ambiente}/{verticale?}/{Entita}/{id}",
+      "description": "Elimina un oggetto",
+      "responseCodes": {
+        "200": "Oggetto eliminato",
+        "400": "Errore di validazione",
+        "404": "Oggetto non trovato",
+        "409": "Violazione logica di business"
+      }
+    },
+    "validate": {
+      "method": "POST",
+      "url": "/v1/{ambiente}/{verticale?}/{Entita}?_op=validate",
+      "description": "Valida un oggetto senza salvarlo",
+      "requestBody": "EntityDTO",
+      "responseCodes": {
+        "200": "Oggetto valido",
+        "400": "Oggetto non specificato",
+        "409": "Oggetto non valido (contiene messaggi di validazione)"
+      }
+    },
+    "validateProperties": {
+      "method": "POST",
+      "url": "/v1/{ambiente}/{verticale?}/{Entita}?_op=validateproperties",
+      "description": "Valida una o più proprietà di un oggetto",
+      "contentType": "application/x-www-form-urlencoded",
+      "responseCodes": {
+        "200": "Proprietà valide",
+        "400": "Proprietà non specificate",
+        "409": "Proprietà non valide"
+      }
+    }
+  },
+
+  "entities": {
+    "implemented": {
+      "ClienteFornitoreMG": {
+        "description": "Clienti e fornitori",
+        "dtoName": "ClienteFornitoreMGDTO",
+        "resourceType": "clienti/fornitori",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"],
+        "keyProperties": ["tipoClifor"],
+        "tipoCliforValues": {
+          "C": "Cliente",
+          "F": "Fornitore"
+        },
+        "examples": {
+          "searchClienti": {
+            "description": "Cerca clienti",
+            "request": {
+              "url": "/v1/1/ClienteFornitoreMG?_op=search",
+              "body": {
+                "pageNumber": 0,
+                "pageSize": 100,
+                "items": [
+                  { "propertyName": "tipoClifor", "value": "C", "comparer": 0, "operator": 1 }
+                ]
+              }
+            }
+          },
+          "searchFornitori": {
+            "description": "Cerca fornitori",
+            "request": {
+              "url": "/v1/1/ClienteFornitoreMG?_op=search",
+              "body": {
+                "pageNumber": 0,
+                "pageSize": 100,
+                "items": [
+                  { "propertyName": "tipoClifor", "value": "F", "comparer": 0, "operator": 1 }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Articolo": {
+        "description": "Articoli magazzino",
+        "dtoName": "ArticoloMGDTO",
+        "resourceType": "articoli",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"],
+        "examples": {
+          "searchByCode": {
+            "description": "Cerca articolo per codice",
+            "request": {
+              "url": "/v1/1/Articolo?_op=search",
+              "body": {
+                "pageNumber": 0,
+                "pageSize": 100,
+                "items": [
+                  { "propertyName": "codiceArticolo", "value": "ART001", "comparer": 0, "operator": 1 }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Documento": {
+        "description": "Testate documenti (fatture, DDT, ordini, ecc.)",
+        "dtoName": "DocumentoTestataMGDTO",
+        "resourceType": "ordini",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties", "approve", "decline"],
+        "specialOperations": {
+          "approve": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/Documento/{id}?_op=approve",
+            "description": "Approva un documento"
+          },
+          "decline": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/Documento/{id}?_op=approve",
+            "description": "Non approva un documento"
+          }
+        },
+        "examples": {
+          "searchFatture": {
+            "description": "Cerca fatture",
+            "request": {
+              "url": "/v1/1/Documento?_op=search",
+              "body": {
+                "pageNumber": 0,
+                "pageSize": 100,
+                "items": [
+                  { "propertyName": "tipoDoc", "value": "FATT", "comparer": 0, "operator": 1 }
+                ]
+              }
+            }
+          },
+          "searchDDT": {
+            "description": "Cerca DDT",
+            "request": {
+              "url": "/v1/1/Documento?_op=search",
+              "body": {
+                "pageNumber": 0,
+                "pageSize": 100,
+                "items": [
+                  { "propertyName": "tipoDoc", "value": "DDT", "comparer": 0, "operator": 1 }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "RigaDocumento": {
+        "description": "Righe documento",
+        "dtoName": "DocumentoRigaMGDTO",
+        "resourceType": "righeOrdine",
+        "operations": ["search"],
+        "note": "Solo ricerca disponibile",
+        "examples": {
+          "searchByDocumentId": {
+            "description": "Cerca righe per ID documento",
+            "request": {
+              "url": "/v1/1/RigaDocumento?_op=search",
+              "body": {
+                "pageNumber": 0,
+                "pageSize": 100,
+                "items": [
+                  { "propertyName": "idTestata", "value": "DOCUMENT_ID", "comparer": 0, "operator": 1 }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "DestinatarioMG": {
+        "description": "Destinatari (sedi di consegna)",
+        "dtoName": "DestinatarioMGDTO",
+        "resourceType": "destinatari",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      }
+    },
+
+    "notImplemented": {
+      "ListinoArticoloLI": {
+        "description": "Listini articolo",
+        "dtoName": "ListinoArticoloLIDTO",
+        "operations": ["search"],
+        "specialOperations": {
+          "searchlistino": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/ListinoArticoloLI?_op=searchlistino",
+            "description": "Ricerca listino secondo data di riferimento",
+            "requestBody": "SearchListinoGroupDTO"
+          }
+        }
+      },
+      "DepositoMG": {
+        "description": "Depositi/Magazzini",
+        "dtoName": "DepositoMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "AgenteMG": {
+        "description": "Agenti",
+        "dtoName": "AgenteMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "AreaMG": {
+        "description": "Aree",
+        "dtoName": "AreaMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "ZonaMG": {
+        "description": "Zone",
+        "dtoName": "ZonaMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "CategoriaMG": {
+        "description": "Categorie articolo",
+        "dtoName": "CategoriaMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "FamigliaMG": {
+        "description": "Famiglie articolo",
+        "dtoName": "FamigliaMGDTO",
+        "operations": ["getById", "search", "validate", "validateproperties"]
+      },
+      "MarcaMG": {
+        "description": "Marche articolo",
+        "dtoName": "MarcaMGDTO",
+        "operations": ["getById", "search", "validate", "validateproperties"]
+      },
+      "GiacenzaMG": {
+        "description": "Giacenze magazzino",
+        "dtoName": "GiacenzaMGDTO",
+        "operations": [],
+        "specialOperations": {
+          "ricalcologiacenza": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/GiacenzaMG?_op=ricalcologiacenza",
+            "description": "Ricalcola le giacenze",
+            "requestBody": "RicalcoloGiacenzaParams"
+          }
+        }
+      },
+      "RicalcoloPrezziMG": {
+        "description": "Ricalcolo prezzi",
+        "dtoName": "RicalcoloPrezziMGDTO",
+        "operations": [],
+        "specialOperations": {
+          "ricalcoloprezzi": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/RicalcoloPrezziMG?_op=ricalcoloprezzi",
+            "description": "Ricalcola i prezzi",
+            "requestBody": "RicalcoloPrezziParams"
+          }
+        }
+      },
+      "ClienteFornitoreArticoloMG": {
+        "description": "Relazioni cliente-fornitore-articolo",
+        "dtoName": "ClienteFornitoreArticoloMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "ArticoloAgenteMG": {
+        "description": "Relazioni articolo-agente",
+        "dtoName": "ArticoloAgenteMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "AgentiMultipliMG": {
+        "description": "Agenti multipli",
+        "dtoName": "AgentiMultipliMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "AnagraficaLottoMG": {
+        "description": "Anagrafica lotti",
+        "dtoName": "AnagraficaLottoMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "CodiceListinoVenditaAcquistoMG": {
+        "description": "Codici listino vendita/acquisto",
+        "dtoName": "CodiceListinoVenditaAcquistoMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "GruppoArticoliMG": {
+        "description": "Gruppi articoli",
+        "dtoName": "GruppoArticoliMGDTO",
+        "operations": ["getById", "search", "validate", "validateproperties"]
+      },
+      "MacroAreaMG": {
+        "description": "Macro aree",
+        "dtoName": "MacroAreaMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "MacroCategoriaMG": {
+        "description": "Macro categorie",
+        "dtoName": "MacroCategoriaMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "Raggruppamento1MG": {
+        "description": "Raggruppamento 1",
+        "dtoName": "Raggruppamento1MGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "Raggruppamento2MG": {
+        "description": "Raggruppamento 2",
+        "dtoName": "Raggruppamento2MGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "Raggruppamento3MG": {
+        "description": "Raggruppamento 3",
+        "dtoName": "Raggruppamento3MGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "SottoFamigliaMG": {
+        "description": "Sotto-famiglie articolo",
+        "dtoName": "SottoFamigliaMGDTO",
+        "operations": ["getById", "search", "validate", "validateproperties"]
+      },
+      "SottoGruppoArticoliMG": {
+        "description": "Sotto-gruppi articoli",
+        "dtoName": "SottoGruppoArticoliMGDTO",
+        "operations": ["getById", "search", "validate", "validateproperties"]
+      },
+      "SottoCategoriaMG": {
+        "description": "Sotto-categorie articolo",
+        "dtoName": "SottoCategoriaMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "CliForClassificazioniMG": {
+        "description": "Classificazioni clienti/fornitori",
+        "dtoName": "CliForClassificazioniMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "IndiceContabileCliForMG": {
+        "description": "Indici contabili clienti/fornitori",
+        "dtoName": "IndiceContabileCliForMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "AnagraficaDocumentoDittaMG": {
+        "description": "Anagrafica documento ditta",
+        "dtoName": "AnagraficaDocumentoDittaMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "HeadingReferenceDocumentMG": {
+        "description": "Riferimenti documento",
+        "dtoName": "HeadingReferenceDocumentMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "ParametriGeneraliDocumentiMG": {
+        "description": "Parametri generali documenti",
+        "dtoName": "ParametriGeneraliDocumentiMGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "ContoPdcCG": {
+        "description": "Conti piano dei conti (Contabilità Generale)",
+        "dtoName": "ContoPdcCGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "GruppoPdcCG": {
+        "description": "Gruppi piano dei conti (Contabilità Generale)",
+        "dtoName": "GruppoPdcCGDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "Agenzia": {
+        "description": "Agenzie bancarie",
+        "dtoName": "AgenziaCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"],
+        "note": "Richiede parametro aggiuntivo codbanca per getById/delete"
+      },
+      "Anagrafica": {
+        "description": "Anagrafica generale",
+        "dtoName": "AnagraficaGeneraleCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "Azienda": {
+        "description": "Aziende",
+        "dtoName": "AziendaCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"],
+        "specialOperations": {
+          "getbyid_polyedro": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/Azienda/{id}?_op=getbyid_polyedro",
+            "description": "Recupera azienda per ID Polyedro"
+          }
+        }
+      },
+      "Banca": {
+        "description": "Banche",
+        "dtoName": "BancaCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "Iva": {
+        "description": "Codici IVA",
+        "dtoName": "CodIvaCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"],
+        "specialOperations": {
+          "verifica_movimentazione_progressivi": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/Iva/{id}?_op=verifica_movimentazione_progressivi",
+            "description": "Verifica se il codice IVA ha movimentato i progressivi"
+          }
+        }
+      },
+      "CondizionePagamentoCO": {
+        "description": "Condizioni di pagamento",
+        "dtoName": "CondizionePagamentoCODTO",
+        "operations": ["getById", "search", "validate", "validateproperties"]
+      },
+      "StatoEsteroCO": {
+        "description": "Stati esteri",
+        "dtoName": "StatoEsteroCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "MasterRegistrazioneCO": {
+        "description": "Master registrazioni",
+        "dtoName": "MasterRegistrazioneCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "AnagraficaIntermedioCO": {
+        "description": "Anagrafiche intermedio",
+        "dtoName": "AnagraficaIntermedioCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "SedeCO": {
+        "description": "Sedi",
+        "dtoName": "SedeCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "ValutaCO": {
+        "description": "Valute",
+        "dtoName": "ValutaCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "ApplicationCO": {
+        "description": "Applicazioni",
+        "dtoName": "ApplicationCODTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"],
+        "specialOperations": {
+          "StartProcess": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/ApplicationCO/StartProcess",
+            "description": "Avvia un processo"
+          },
+          "SuccessFulEndedProcess": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/ApplicationCO/SuccessFulEndedProcess",
+            "description": "Termina con successo un processo"
+          },
+          "ResetProcess": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/ApplicationCO/ResetProcess",
+            "description": "Reset di un processo"
+          }
+        }
+      },
+      "License": {
+        "description": "Licenze",
+        "dtoName": "LicenseFWDTO",
+        "operations": ["getById"],
+        "note": "Supporta parametro info=true per validazione completa"
+      },
+      "polyedroservice": {
+        "description": "Servizi Polyedro",
+        "dtoName": "PolyedroWSFWDTO",
+        "operations": ["getById", "search", "create", "update", "delete", "validate", "validateproperties"]
+      },
+      "Hypermedia": {
+        "description": "Media/Allegati",
+        "operations": [],
+        "specialOperations": {
+          "defaultpath": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/Hypermedia/{IdMedia}?_op=defaultpath",
+            "description": "Recupera il path del media di default"
+          },
+          "defaultmedia": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/Hypermedia/{IdMedia}?_op=defaultmedia",
+            "description": "Recupera lo stream del media di default"
+          },
+          "allpaths": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/Hypermedia/{IdMedia}?_op=allpaths",
+            "description": "Recupera i path di tutti i media"
+          },
+          "allmedias": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/Hypermedia/{IdMedia}?_op=allmedias",
+            "description": "Recupera tutti i media (zip se multipli)"
+          }
+        }
+      },
+      "Approve": {
+        "description": "Approvazione APProvo",
+        "operations": [],
+        "specialOperations": {
+          "checkLicense": {
+            "method": "POST",
+            "url": "/v1/{ambiente}/{verticale?}/Approve?_op=checkLicense",
+            "description": "Verifica licenza APProvo Enterprise/Start"
+          }
+        }
+      }
+    }
+  },
+
+  "authEndpoints": {
+    "environments": {
+      "list": {
+        "method": "GET",
+        "url": "/auth/environments",
+        "description": "Recupera tutti gli ambienti disponibili"
+      },
+      "getById": {
+        "method": "GET",
+        "url": "/auth/environments/{id}",
+        "description": "Recupera ambiente per ID"
+      },
+      "getByKey": {
+        "method": "GET",
+        "url": "/auth/environments/{env}",
+        "description": "Recupera ambiente per chiave"
+      }
+    }
+  },
+
+  "dtos": {
+    "SearchGroupDTO": {
+      "description": "DTO per le ricerche",
+      "properties": {
+        "pageNumber": { "type": "integer", "description": "Numero pagina (zero-based)" },
+        "pageSize": { "type": "integer", "description": "Dimensione pagina" },
+        "items": { "type": "array", "description": "Array di filtri SearchItemDTO" }
+      }
+    },
+    "SearchItemDTO": {
+      "description": "Singolo filtro di ricerca",
+      "properties": {
+        "propertyName": { "type": "string", "description": "Nome proprietà" },
+        "value": { "type": "string", "description": "Valore" },
+        "comparer": { "type": "integer", "description": "Tipo confronto" },
+        "operator": { "type": "integer", "description": "Operatore logico" }
+      }
+    },
+    "ValidateDTO": {
+      "description": "Risposta validazione",
+      "properties": {
+        "isValid": { "type": "boolean" },
+        "messages": { "type": "array" }
+      }
+    },
+    "SearchListinoGroupDTO": {
+      "description": "DTO per ricerca listino con data",
+      "properties": {
+        "referenceDate": { "type": "string", "format": "date-time" },
+        "pageNumber": { "type": "integer" },
+        "pageSize": { "type": "integer" },
+        "items": { "type": "array" }
+      }
+    },
+    "RicalcoloGiacenzaParams": {
+      "description": "Parametri per ricalcolo giacenze",
+      "properties": {
+        "idArticolo": { "type": "string" },
+        "idDeposito": { "type": "string" },
+        "dataRiferimento": { "type": "string", "format": "date-time" }
+      }
+    },
+    "RicalcoloPrezziParams": {
+      "description": "Parametri per ricalcolo prezzi",
+      "properties": {
+        "idArticolo": { "type": "string" },
+        "idListino": { "type": "string" },
+        "dataRiferimento": { "type": "string", "format": "date-time" }
+      }
+    },
+    "FileResourceDTO": {
+      "description": "Risorsa file",
+      "properties": {
+        "fileName": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "content": { "type": "string", "description": "Contenuto base64" }
+      }
+    }
+  },
+
+  "examples": {
+    "fullSearchRequest": {
+      "description": "Esempio completo di richiesta di ricerca",
+      "curl": "curl -X POST \"http://miorouter.homeip.net:9080/api/v1/1/ClienteFornitoreMG?_op=search\" -H \"Authorization: Basic <base64>\" -H \"Authorization-Scope: 1\" -H \"Content-Type: application/json\" -d '{\"pageNumber\":0,\"pageSize\":100,\"items\":[{\"propertyName\":\"tipoClifor\",\"value\":\"C\",\"comparer\":0,\"operator\":1}]}'"
+    },
+    "getByIdRequest": {
+      "description": "Esempio di richiesta per ID",
+      "curl": "curl -X GET \"http://miorouter.homeip.net:9080/api/v1/1/Articolo/ARTICLE_ID\" -H \"Authorization: Basic <base64>\" -H \"Authorization-Scope: 1\""
+    },
+    "createRequest": {
+      "description": "Esempio di creazione",
+      "curl": "curl -X POST \"http://miorouter.homeip.net:9080/api/v1/1/Articolo\" -H \"Authorization: Basic <base64>\" -H \"Authorization-Scope: 1\" -H \"Content-Type: application/json\" -d '{\"codiceArticolo\":\"NEW001\",\"descrizione\":\"Nuovo articolo\"}'"
+    }
+  },
+
+  "notes": {
+    "pagination": "IMPORTANTE: pageNumber è ZERO-BASED! La prima pagina è 0, non 1.",
+    "pageSize": "Il pageSize minimo consigliato è 100 per evitare troppe chiamate.",
+    "auth": "Oltre a Basic Auth, è obbligatorio l'header Authorization-Scope con il valore dello scope (solitamente 1).",
+    "verticale": "Il parametro verticale è opzionale nella maggior parte delle chiamate.",
+    "errorHandling": "Gli errori 400/409 restituiscono messaggi di validazione nel body della risposta.",
+    "force": "Il parametro force permette di ignorare errori specifici durante operazioni di scrittura."
+  }
+}

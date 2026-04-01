@@ -1196,8 +1196,15 @@ export default function Home() {
           />
 
           <section className="flex min-h-0 flex-col border-r border-slate-200">
-            <header className="h-11 border-b border-slate-200 bg-white px-4 text-xs text-slate-500 flex items-center mono">
-              TS-API Explorer
+            <header className="h-11 border-b border-slate-200 bg-white px-4 text-xs text-slate-500 flex items-center justify-between mono">
+              <span>TS-API Explorer</span>
+              <a
+                href="/config"
+                className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+              >
+                <span>⚙️</span>
+                <span>Config</span>
+              </a>
             </header>
 
             {error && (

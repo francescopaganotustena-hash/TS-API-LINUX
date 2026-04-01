@@ -2,12 +2,72 @@
  * Client Alyante:
  * - Ricerca entity Swagger via _op=search
  * - Chiamata diretta cliente per test rapido
+ * - Supporta configurazione dinamica da file config.json
  */
 
-const GESTIONALE_API_URL = process.env.GESTIONALE_API_URL;
-const GESTIONALE_USERNAME = process.env.GESTIONALE_USERNAME;
-const GESTIONALE_PASSWORD = process.env.GESTIONALE_PASSWORD;
-const GESTIONALE_AUTH_SCOPE = process.env.GESTIONALE_AUTH_SCOPE || "1";
+import fs from 'fs';
+import path from 'path';
+
+const CONFIG_FILE = path.join(process.cwd(), 'data', 'config.json');
+
+interface DynamicConfig {
+  apiUrl: string;
+  username: string;
+  password: string;
+  authScope: string;
+}
+
+// Cache per la configurazione dinamica
+let cachedConfig: DynamicConfig | null = null;
+let configLoadAttempted = false;
+
+function loadDynamicConfig(): DynamicConfig | null {
+  if (configLoadAttempted) return cachedConfig;
+  configLoadAttempted = true;
+  
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
+      const config = JSON.parse(content) as DynamicConfig;
+      if (config.apiUrl && config.username && config.password) {
+        cachedConfig = config;
+        return cachedConfig;
+      }
+    }
+  } catch (error) {
+    console.error('Errore caricamento config dinamico:', error);
+  }
+  
+  return null;
+}
+
+// Funzione per ottenere i valori di configurazione (dinamica o env)
+function getConfigValue(key: keyof DynamicConfig): string | undefined {
+  const dynamicConfig = loadDynamicConfig();
+  if (dynamicConfig && dynamicConfig[key]) {
+    return dynamicConfig[key];
+  }
+  
+  // Fallback su variabili d'ambiente
+  switch (key) {
+    case 'apiUrl': return process.env.GESTIONALE_API_URL;
+    case 'username': return process.env.GESTIONALE_USERNAME;
+    case 'password': return process.env.GESTIONALE_PASSWORD;
+    case 'authScope': return process.env.GESTIONALE_AUTH_SCOPE || '1';
+    default: return undefined;
+  }
+}
+
+// Funzione per invalidare la cache (utile dopo salvataggio config)
+export function invalidateConfigCache() {
+  cachedConfig = null;
+  configLoadAttempted = false;
+}
+
+const GESTIONALE_API_URL = getConfigValue('apiUrl') || process.env.GESTIONALE_API_URL;
+const GESTIONALE_USERNAME = getConfigValue('username') || process.env.GESTIONALE_USERNAME;
+const GESTIONALE_PASSWORD = getConfigValue('password') || process.env.GESTIONALE_PASSWORD;
+const GESTIONALE_AUTH_SCOPE = getConfigValue('authScope') || process.env.GESTIONALE_AUTH_SCOPE || "1";
 const MIN_PAGE_SIZE = 100;
 const REMOTE_SAFE_PAGE_SIZE = 50;
 
