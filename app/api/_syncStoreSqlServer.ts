@@ -1349,7 +1349,6 @@ function extractLatestUpdatedAt(rows: Record<string, unknown>[]): string | null 
 export async function clearAllSyncData(): Promise<{ deletedJobs: number; deletedRows: number; tablesCleared: string[] }> {
   await ensureSchema();
   const connection = await getPool();
-  const sql = getSql();
 
   const tablesToClear = [
     "sync_jobs",
