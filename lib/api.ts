@@ -2,13 +2,27 @@
  * Client Alyante:
  * - Ricerca entity Swagger via _op=search
  * - Chiamata diretta cliente per test rapido
- * - Supporta configurazione dinamica da file config.json
+ * - Supporta configurazione dinamica da file config.json (multi-server)
  */
 
 import fs from 'fs';
 import path from 'path';
 
 const CONFIG_FILE = path.join(process.cwd(), 'data', 'config.json');
+
+interface ServerConfig {
+  id: string;
+  name: string;
+  apiUrl: string;
+  username: string;
+  password: string;
+  authScope: string;
+}
+
+interface MultiServerConfig {
+  servers: ServerConfig[];
+  activeServerId: string | null;
+}
 
 interface DynamicConfig {
   apiUrl: string;
@@ -28,8 +42,26 @@ function loadDynamicConfig(): DynamicConfig | null {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
-      const config = JSON.parse(content) as DynamicConfig;
-      if (config.apiUrl && config.username && config.password) {
+      const parsed = JSON.parse(content);
+      
+      // Nuovo formato multi-server
+      if (parsed.servers && Array.isArray(parsed.servers)) {
+        const multiConfig = parsed as MultiServerConfig;
+        const activeServer = multiConfig.servers.find(s => s.id === multiConfig.activeServerId);
+        if (activeServer && activeServer.apiUrl && activeServer.username && activeServer.password) {
+          cachedConfig = {
+            apiUrl: activeServer.apiUrl,
+            username: activeServer.username,
+            password: activeServer.password,
+            authScope: activeServer.authScope || '1',
+          };
+          return cachedConfig;
+        }
+      }
+      
+      // Vecchio formato singolo server (fallback)
+      if (parsed.apiUrl && parsed.username && parsed.password) {
+        const config = parsed as DynamicConfig;
         cachedConfig = config;
         return cachedConfig;
       }
@@ -62,6 +94,25 @@ function getConfigValue(key: keyof DynamicConfig): string | undefined {
 export function invalidateConfigCache() {
   cachedConfig = null;
   configLoadAttempted = false;
+}
+
+// Funzione per ottenere il nome del server attivo (per display)
+export function getActiveServerName(): string | null {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      
+      if (parsed.servers && Array.isArray(parsed.servers)) {
+        const multiConfig = parsed as MultiServerConfig;
+        const activeServer = multiConfig.servers.find(s => s.id === multiConfig.activeServerId);
+        return activeServer?.name || null;
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return null;
 }
 
 const GESTIONALE_API_URL = getConfigValue('apiUrl') || process.env.GESTIONALE_API_URL;
