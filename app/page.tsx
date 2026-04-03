@@ -1168,9 +1168,24 @@ export default function Home() {
   const rootCount = dataByResource[activeResource]?.length ?? treeNodes.length;
 
   return (
-    <main className="min-h-screen p-2 md:p-4">
-      <div className="mx-auto h-[calc(100vh-1rem)] max-w-[1600px] overflow-hidden rounded-2xl border border-slate-300 bg-slate-100 shadow-[0_20px_60px_rgba(15,23,42,0.16)] md:h-[calc(100vh-2rem)]">
-        <div className="grid h-full grid-cols-1 md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,1fr)_330px]">
+    <main className="min-h-screen p-3 md:p-5">
+      <div className="mx-auto h-[calc(100vh-1.5rem)] max-w-[1680px] overflow-hidden rounded-[24px] border border-slate-300/80 bg-[linear-gradient(165deg,rgba(255,255,255,0.88),rgba(236,246,253,0.92))] shadow-[0_30px_80px_rgba(15,23,42,0.16)] backdrop-blur-sm md:h-[calc(100vh-2.5rem)]">
+        <div className="flex h-[62px] items-center justify-between border-b border-cyan-200/70 bg-[linear-gradient(90deg,#0f172a_0%,#0f2b3f_55%,#155e75_100%)] px-5 text-cyan-50">
+          <div className="flex items-center gap-3">
+            <span className="rounded-md border border-cyan-100/30 bg-cyan-200/15 px-2 py-1 text-[10px] font-semibold tracking-[0.14em]">NUOVA UI</span>
+            <span className="text-sm font-semibold tracking-[0.08em]">TS-API PORTAL RESTYLING</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a
+              href="/config"
+              className="rounded-lg border border-cyan-100/30 bg-cyan-200/15 px-3 py-1.5 text-xs font-semibold text-cyan-50 transition hover:bg-cyan-200/30"
+            >
+              Settings
+            </a>
+            <span className="mono text-[11px] text-cyan-100/90">Build grafica 2026.04</span>
+          </div>
+        </div>
+        <div className="grid h-[calc(100%-62px)] grid-cols-1 md:grid-cols-[272px_minmax(0,1fr)] xl:grid-cols-[272px_minmax(0,1fr)_360px]">
           <ResourceSidebar
             resources={sidebarResources}
             activeResourceId={activeResource}
@@ -1195,15 +1210,14 @@ export default function Home() {
             className="h-full"
           />
 
-          <section className="flex min-h-0 flex-col border-r border-slate-200">
-            <header className="h-11 border-b border-slate-200 bg-white px-4 text-xs text-slate-500 flex items-center justify-between mono">
-              <span>TS-API Explorer</span>
+          <section className="flex min-h-0 flex-col border-r border-slate-200/80 bg-white/60">
+            <header className="h-14 border-b border-slate-200/80 bg-white/90 px-5 text-xs text-slate-500 flex items-center justify-between mono">
+              <span className="tracking-wide text-slate-600">TS-API EXPLORER</span>
               <a
                 href="/config"
-                className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
               >
-                <span>⚙️</span>
-                <span>Config</span>
+                <span>Settings</span>
               </a>
             </header>
 
@@ -1233,8 +1247,8 @@ export default function Home() {
                     ? "Sto recuperando i dati dal gestionale..."
                     : "Prova un filtro diverso o cambia risorsa dal menu a sinistra."
                 }
-                footerLeft={`${rootCount} ${activeMeta.title.toLowerCase()} • Alyante API v1`}
-                footerRight={`Ambiente ${searchContext.ambiente} • ${searchContext.utente}`}
+                footerLeft={`${rootCount} ${activeMeta.title.toLowerCase()} | Alyante API v1`}
+                footerRight={`Ambiente ${searchContext.ambiente} | ${searchContext.utente}`}
                 className="h-full"
               />
             </div>

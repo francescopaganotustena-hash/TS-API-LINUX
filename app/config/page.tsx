@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -103,17 +103,17 @@ export default function ConfigPage() {
   function validateField(field: string, value: string): string | null {
     switch (field) {
       case 'name':
-        if (!value.trim()) return 'Nome server è obbligatorio';
+        if (!value.trim()) return 'Nome server Ã¨ obbligatorio';
         if (value.trim().length < 3) return 'Nome deve avere almeno 3 caratteri';
         if (value.trim().length > 50) return 'Nome troppo lungo (max 50 caratteri)';
         // Verifica duplicati (solo per nuovo server)
         if (!editingServer && config.servers.some(s => s.name.toLowerCase() === value.trim().toLowerCase())) {
-          return 'Nome già in uso';
+          return 'Nome giÃ  in uso';
         }
         return null;
       
       case 'apiUrl':
-        if (!value.trim()) return 'URL API è obbligatorio';
+        if (!value.trim()) return 'URL API Ã¨ obbligatorio';
         try {
           const url = new URL(value.trim());
           if (!url.protocol.startsWith('http')) return 'Protocollo non valido (usa http:// o https://)';
@@ -125,18 +125,18 @@ export default function ConfigPage() {
         return null;
       
       case 'username':
-        if (!value.trim()) return 'Username è obbligatorio';
+        if (!value.trim()) return 'Username Ã¨ obbligatorio';
         if (value.trim().length < 2) return 'Username troppo corto (min 2 caratteri)';
         return null;
       
       case 'password':
-        if (!value) return 'Password è obbligatoria';
-        if (value === '••••••••') return 'Inserisci la password reale';
+        if (!value) return 'Password Ã¨ obbligatoria';
+        if (value === 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢') return 'Inserisci la password reale';
         if (value.length < 2) return 'Password troppo corta (min 2 caratteri)';
         return null;
       
       case 'authScope':
-        if (!value.trim()) return 'Auth Scope è obbligatorio';
+        if (!value.trim()) return 'Auth Scope Ã¨ obbligatorio';
         if (!/^\d+$/.test(value.trim())) return 'Auth Scope deve essere un numero';
         return null;
       
@@ -254,7 +254,7 @@ export default function ConfigPage() {
   }
 
   function requestSwitchServer(serverId: string) {
-    // Se è lo stesso server attivo, non fare nulla
+    // Se Ã¨ lo stesso server attivo, non fare nulla
     if (serverId === config.activeServerId) return;
     
     setPendingSwitchServerId(serverId);
@@ -308,7 +308,7 @@ export default function ConfigPage() {
     const server = config.servers.find(s => s.id === serverId);
     if (!server) return;
     
-    if (!confirm(`Sei sicuro di voler eliminare il server "${server.name}"?\n\nQuesta operazione non può essere annullata.`)) {
+    if (!confirm(`Sei sicuro di voler eliminare il server "${server.name}"?\n\nQuesta operazione non puÃ² essere annullata.`)) {
       return;
     }
     
@@ -358,7 +358,7 @@ export default function ConfigPage() {
   }
 
   async function handleReset() {
-    if (!confirm('Sei sicuro di voler rimuovere TUTTI i server salvati?\n\nTornerai ad usare le variabili d\'ambiente.\nQuesta operazione non può essere annullata.')) {
+    if (!confirm('Sei sicuro di voler rimuovere TUTTI i server salvati?\n\nTornerai ad usare le variabili d\'ambiente.\nQuesta operazione non puÃ² essere annullata.')) {
       return;
     }
     
@@ -408,508 +408,644 @@ export default function ConfigPage() {
     setShowClearConfirm(false);
   }
 
+  const panel = 'rounded-3xl border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur';
+  const panelInner = 'p-5 sm:p-6';
+  const label = 'text-xs font-semibold uppercase tracking-[0.18em] text-slate-500';
+  const muted = 'text-sm text-slate-500';
+  const badgeBase = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset';
+  const btnBase = 'inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+  const btnPrimary = 'bg-slate-900 text-white hover:bg-slate-700 focus:ring-slate-400';
+  const btnSecondary = 'border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 focus:ring-slate-200';
+  const btnDanger = 'bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-400';
+  const btnSoft = 'bg-slate-100 text-slate-700 hover:bg-slate-200 focus:ring-slate-200';
+  const inputBase = 'mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10';
+  const inputError = 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10';
+  const inputNormal = 'border-slate-300';
+  const sectionHeader = 'flex flex-col gap-3 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-end sm:justify-between';
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <div className="text-lg text-gray-600">Caricamento configurazione...</div>
+      <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.06),transparent_28%)]" />
+        <div className="flex min-h-screen items-center justify-center px-4">
+          <div className={`${panel} w-full max-w-md ${panelInner} text-center`}>
+            <div className="mx-auto mb-4 h-14 w-14 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
+            <div className="text-lg font-semibold text-slate-950">Caricamento configurazione</div>
+            <div className={`mt-1 ${muted}`}>Recupero impostazioni server e stato corrente...</div>
+          </div>
         </div>
       </div>
     );
   }
 
   const activeServer = getActiveServer();
+  const activeServerName = activeServer?.name || 'Nessuno';
+  const pendingServerName = config.servers.find(s => s.id === pendingSwitchServerId)?.name || '';
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-3xl mx-auto px-4">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-gray-800">
-              Configurazione Server API
-            </h1>
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-1 text-xs rounded-full ${
-                config.configured 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {config.configured ? '✓ Configurato' : '⚠ Non configurato'}
-              </span>
-              <span className={`px-2 py-1 text-xs rounded-full ${
-                config.source === 'file' 
-                  ? 'bg-blue-100 text-blue-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {config.source === 'file' ? '📁 File config' : '🔐 Env vars'}
-              </span>
-            </div>
-          </div>
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(15,23,42,0.06),transparent_30%)]" />
 
-          {/* Messaggi */}
-          {message && (
-            <div className={`mb-4 p-4 rounded-md border ${
-              message.type === 'success' 
-                ? 'bg-green-50 text-green-800 border-green-200' 
-                : message.type === 'warning'
-                ? 'bg-yellow-50 text-yellow-800 border-yellow-200'
-                : 'bg-red-50 text-red-800 border-red-200'
-            }`}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">
-                  {message.type === 'success' ? '✅' : message.type === 'warning' ? '⚠️' : '❌'}
-                </span>
-                <span>{message.text}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Ultimo aggiornamento */}
-          {config.lastUpdated && (
-            <div className="mb-4 text-sm text-gray-500">
-              Ultimo aggiornamento: {new Date(config.lastUpdated).toLocaleString('it-IT')}
-            </div>
-          )}
-
-          {/* Lista Server */}
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-700 mb-3">
-              📋 Server Salvati ({config.servers.length})
-            </h2>
-            
-            {config.servers.length === 0 ? (
-              <div className="text-gray-500 text-sm p-4 bg-gray-50 rounded-md border border-gray-200">
-                Nessun server configurato. Aggiungi un server o usa le variabili d'ambiente.
-              </div>
-            ) : (
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+        <div className="space-y-6">
+          <header className={`${panel} ${panelInner}`}>
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="space-y-3">
-                {config.servers.map((server) => (
-                  <div 
-                    key={server.id}
-                    className={`p-4 rounded-md border transition-all ${
-                      server.id === config.activeServerId 
-                        ? 'border-green-500 bg-green-50 shadow-sm' 
-                        : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                <div className={label}>Configuration</div>
+                <div>
+                  <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+                    Configurazione Server API
+                  </h1>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+                    Gestisci piu server, cambia il server attivo e verifica la connessione da una sola schermata.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`${badgeBase} ${
+                    config.configured
+                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                      : 'bg-amber-50 text-amber-700 ring-amber-200'
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${config.configured ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                  {config.configured ? 'Configurato' : 'Non configurato'}
+                </span>
+                <span
+                  className={`${badgeBase} ${
+                    config.source === 'file'
+                      ? 'bg-sky-50 text-sky-700 ring-sky-200'
+                      : 'bg-slate-100 text-slate-700 ring-slate-200'
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${config.source === 'file' ? 'bg-sky-500' : 'bg-slate-500'}`} />
+                  {config.source === 'file' ? 'File config' : 'Env vars'}
+                </span>
+                {config.lastUpdated && (
+                  <span className={`${badgeBase} bg-white text-slate-600 ring-slate-200`}>
+                    Aggiornato {new Date(config.lastUpdated).toLocaleString('it-IT')}
+                  </span>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {message && (
+            <div
+              role="status"
+              className={`border-l-4 px-4 py-3 ${panel} ${
+                message.type === 'success'
+                  ? 'border-l-emerald-500 bg-emerald-50/80 text-emerald-900'
+                  : message.type === 'warning'
+                  ? 'border-l-amber-500 bg-amber-50/80 text-amber-900'
+                  : 'border-l-rose-500 bg-rose-50/80 text-rose-900'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                    message.type === 'success'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : message.type === 'warning'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-rose-100 text-rose-700'
+                  }`}
+                >
+                  {message.type === 'success' ? 'OK' : message.type === 'warning' ? '!' : 'x'}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">
+                    {message.type === 'success' ? 'Operazione completata' : message.type === 'warning' ? 'Attenzione' : 'Errore'}
+                  </div>
+                  <div className="text-sm leading-6">{message.text}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
+            <section className={`${panel} ${panelInner}`}>
+              <div className={sectionHeader}>
+                <div>
+                  <div className={label}>Servers</div>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-950">Server salvati</h2>
+                  <p className={`mt-1 ${muted}`}>
+                    {config.servers.length} server disponibili, con cambio attivo e modifica inline.
+                  </p>
+                </div>
+                <button onClick={startAddServer} className={`${btnBase} ${btnPrimary} w-full sm:w-auto`}>
+                  Aggiungi server
+                </button>
+              </div>
+
+              <div className="mt-5">
+                {config.servers.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-sm text-slate-600">
+                    Nessun server configurato. Aggiungine uno oppure usa le variabili d&apos;ambiente.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {config.servers.map(server => {
+                      const isActive = server.id === config.activeServerId;
+                      return (
+                        <article
+                          key={server.id}
+                          className={`rounded-2xl border p-4 transition-all ${
+                            isActive
+                              ? 'border-emerald-200 bg-emerald-50/80 shadow-sm'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                          }`}
+                        >
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="truncate text-base font-semibold text-slate-950">{server.name}</h3>
+                                <span
+                                  className={`${badgeBase} ${
+                                    isActive
+                                      ? 'bg-emerald-100 text-emerald-700 ring-emerald-200'
+                                      : 'bg-slate-100 text-slate-600 ring-slate-200'
+                                  }`}
+                                >
+                                  <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                  {isActive ? 'Attivo' : 'Inattivo'}
+                                </span>
+                              </div>
+                              <p className="mt-1 truncate text-sm text-slate-600">{server.apiUrl}</p>
+                              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                                <span className="rounded-full bg-slate-100 px-2.5 py-1">Username: {server.username}</span>
+                                <span className="rounded-full bg-slate-100 px-2.5 py-1">Scope: {server.authScope || '1'}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2 sm:items-end">
+                              <div className="flex flex-wrap gap-2">
+                                {server.id !== config.activeServerId && (
+                                  <button
+                                    onClick={() => requestSwitchServer(server.id)}
+                                    className={`${btnBase} ${btnSecondary} w-full sm:w-auto`}
+                                    title="Attiva questo server"
+                                  >
+                                    Attiva
+                                  </button>
+                                )}
+                                {server.id !== 'env' && (
+                                  <>
+                                    <button
+                                      onClick={() => startEditServer(server)}
+                                      className={`${btnBase} ${btnSoft} w-full sm:w-auto`}
+                                      title="Modifica server"
+                                    >
+                                      Modifica
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteServer(server.id)}
+                                      disabled={server.id === config.activeServerId}
+                                      className={`${btnBase} ${btnDanger} w-full sm:w-auto disabled:bg-rose-300`}
+                                      title={
+                                        server.id === config.activeServerId
+                                          ? 'Non puoi eliminare il server attivo'
+                                          : 'Elimina server'
+                                      }
+                                    >
+                                      Elimina
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                              {isActive && (
+                                <span className="text-xs font-medium text-emerald-700">
+                                  Server in uso dalla configurazione corrente
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <div className="space-y-6">
+              <section className={`${panel} ${panelInner}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className={label}>Active server</div>
+                    <h2 className="mt-1 text-xl font-semibold text-slate-950">Server attivo</h2>
+                  </div>
+                  <span
+                    className={`${badgeBase} ${
+                      activeServer
+                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                        : 'bg-slate-100 text-slate-600 ring-slate-200'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className={`text-lg flex-shrink-0`}>
-                          {server.id === config.activeServerId ? '✅' : '⚪'}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="font-medium text-gray-800 truncate">{server.name}</div>
-                          <div className="text-sm text-gray-500 truncate">{server.apiUrl}</div>
-                          {server.id === config.activeServerId && (
-                            <span className="text-xs text-green-600 font-medium">Server Attivo</span>
-                          )}
-                        </div>
+                    <span className={`h-2 w-2 rounded-full ${activeServer ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                    {activeServer ? 'Online' : 'Nessuno'}
+                  </span>
+                </div>
+
+                {activeServer ? (
+                  <div className="mt-5 space-y-5">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl bg-slate-50 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nome</div>
+                        <div className="mt-1 text-sm font-medium text-slate-900">{activeServer.name}</div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {server.id !== config.activeServerId && (
-                          <button
-                            onClick={() => requestSwitchServer(server.id)}
-                            className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                            title="Attiva questo server"
-                          >
-                            🔄 Attiva
-                          </button>
-                        )}
-                        {server.id !== 'env' && (
-                          <>
-                            <button
-                              onClick={() => startEditServer(server)}
-                              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                              title="Modifica server"
-                            >
-                              ✏️ Modifica
-                            </button>
-                            <button
-                              onClick={() => handleDeleteServer(server.id)}
-                              disabled={server.id === config.activeServerId}
-                              className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            title={server.id === config.activeServerId ? "Non puoi eliminare il server attivo" : "Elimina server"}
-                            >
-                              🗑️ Elimina
-                            </button>
-                          </>
-                        )}
+                      <div className="rounded-2xl bg-slate-50 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Username</div>
+                        <div className="mt-1 truncate text-sm font-medium text-slate-900">{activeServer.username}</div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Scope</div>
+                        <div className="mt-1 text-sm font-medium text-slate-900">{activeServer.authScope}</div>
                       </div>
                     </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Endpoint</div>
+                      <div className="mt-1 break-all text-sm font-medium text-slate-900">{activeServer.apiUrl}</div>
+                    </div>
+
+                    {testResult && (
+                      <div
+                        className={`rounded-2xl border p-4 ${
+                          testResult.success
+                            ? 'border-emerald-200 bg-emerald-50/80'
+                            : 'border-rose-200 bg-rose-50/80'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                              testResult.success ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                            }`}
+                          >
+                            {testResult.success ? 'OK' : 'x'}
+                          </span>
+                          <div className="min-w-0 space-y-2">
+                            <div className={`text-sm font-semibold ${testResult.success ? 'text-emerald-900' : 'text-rose-900'}`}>
+                              {testResult.success ? testResult.message : testResult.error}
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                              {testResult.elapsedMs && (
+                                <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-slate-200">Tempo: {testResult.elapsedMs}ms</span>
+                              )}
+                              {testResult.serverInfo && (
+                                <>
+                                  <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-slate-200">
+                                    Licenza: {testResult.serverInfo.license}
+                                  </span>
+                                  <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-slate-200">
+                                    Versione: {testResult.serverInfo.version}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <button onClick={() => handleTest(false)} disabled={testing || !config.configured} className={`${btnBase} ${btnPrimary} w-full`}>
+                      {testing ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          Test in corso
+                        </>
+                      ) : (
+                        'Test connessione'
+                      )}
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
-            
-            <button
-              onClick={startAddServer}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              ➕ Aggiungi Nuovo Server
-            </button>
+                ) : (
+                  <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-4 text-sm text-slate-600">
+                    Nessun server attivo selezionato. Attiva uno dei server salvati per vedere i dettagli e avviare il test.
+                  </p>
+                )}
+              </section>
+
+              <section className={`${panel} ${panelInner}`}>
+                <div className={sectionHeader}>
+                  <div>
+                    <div className={label}>Maintenance</div>
+                    <h2 className="mt-1 text-xl font-semibold text-slate-950">Manutenzione database</h2>
+                    <p className={`mt-1 ${muted}`}>
+                      Operazioni distruttive con conferma esplicita e layout separato per ridurre errori.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                  <button onClick={requestClearConfirmation} disabled={clearing} className={`${btnBase} ${btnDanger} w-full sm:w-auto`}>
+                    Cancella log e database
+                  </button>
+                  {config.source === 'file' && config.servers.length > 0 && (
+                    <button
+                      onClick={handleReset}
+                      className={`${btnBase} ${btnSecondary} w-full sm:w-auto text-rose-700 hover:border-rose-300 hover:bg-rose-50`}
+                    >
+                      Reset configurazione
+                    </button>
+                  )}
+                </div>
+                <p className="mt-4 text-xs leading-5 text-slate-500">
+                  Cancella tutti i log delle sincronizzazioni precedenti e resetta il database SQL Server.
+                  <strong className="text-rose-700"> Questa operazione e irreversibile.</strong>
+                </p>
+              </section>
+
+              <section className={`${panel} ${panelInner}`}>
+                <div className={sectionHeader}>
+                  <div>
+                    <div className={label}>Info</div>
+                    <h2 className="mt-1 text-xl font-semibold text-slate-950">Dettagli configurazione</h2>
+                  </div>
+                </div>
+
+                <ul className="mt-5 space-y-2 text-sm text-slate-600">
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>
+                      La configurazione viene salvata in <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[0.8rem] text-slate-700">data/config.json</code>
+                    </span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>Puoi salvare piu server e cambiare il server attivo in qualsiasi momento</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>
+                      <strong className="text-rose-700">Il cambio server attivo cancella automaticamente tutti i dati</strong>
+                    </span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>Se non configurato, vengono usate le variabili ambiente</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>
+                      Backup automatico in <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[0.8rem] text-slate-700">data/config.backup.json</code>
+                    </span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>
+                      Log operazioni in <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[0.8rem] text-slate-700">data/operations.log</code>
+                    </span>
+                  </li>
+                </ul>
+              </section>
+            </div>
           </div>
 
-          {/* Form per aggiungere/modificare server */}
-          {showServerForm && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">
-                  {editingServer ? `✏️ Modifica: ${editingServer.name}` : '➕ Aggiungi Nuovo Server'}
-                </h2>
-                
-                <div className="space-y-4">
-                  {/* Nome Server */}
+          <div className={`${panel} ${panelInner}`}>
+            <Link href="/" className="inline-flex items-center text-sm font-medium text-blue-700 transition-colors hover:text-blue-900">
+              Torna alla Home
+            </Link>
+          </div>
+        </div>
+
+        {/* Form per aggiungere/modificare server */}
+        {showServerForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+            <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-slate-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.2)]">
+              <div className="border-b border-slate-200 px-5 py-5 sm:px-6">
+                <div className="flex items-start justify-between gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nome Server *
-                    </label>
+                    <div className={label}>Server form</div>
+                    <h2 className="mt-1 text-2xl font-semibold text-slate-950">
+                      {editingServer ? `Modifica ${editingServer.name}` : 'Aggiungi nuovo server'}
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Compila i campi richiesti, poi salva per aggiornare la configurazione.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 py-5 sm:px-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className={label}>Nome server *</label>
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => handleFieldChange('name', e.target.value)}
+                      onChange={e => handleFieldChange('name', e.target.value)}
                       placeholder="es. Produzione, Test, Cliente XYZ"
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                        formErrors.name && formTouched.name
-                          ? 'border-red-500 focus:ring-red-500'
-                          : 'border-gray-300 focus:ring-blue-500'
-                      }`}
+                      className={`${inputBase} ${formErrors.name && formTouched.name ? inputError : inputNormal}`}
                     />
-                    {formErrors.name && formTouched.name && (
-                      <p className="mt-1 text-sm text-red-600">{formErrors.name}</p>
-                    )}
+                    {formErrors.name && formTouched.name && <p className="mt-1.5 text-sm text-rose-600">{formErrors.name}</p>}
                   </div>
 
-                  {/* URL API */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      URL API *
-                    </label>
+                  <div className="md:col-span-2">
+                    <label className={label}>URL API *</label>
                     <input
                       type="url"
                       value={formData.apiUrl}
-                      onChange={(e) => handleFieldChange('apiUrl', e.target.value)}
+                      onChange={e => handleFieldChange('apiUrl', e.target.value)}
                       placeholder="http://server:9080/api/v1"
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                        formErrors.apiUrl && formTouched.apiUrl
-                          ? 'border-red-500 focus:ring-red-500'
-                          : 'border-gray-300 focus:ring-blue-500'
-                      }`}
+                      className={`${inputBase} ${formErrors.apiUrl && formTouched.apiUrl ? inputError : inputNormal}`}
                     />
-                    {formErrors.apiUrl && formTouched.apiUrl && (
-                      <p className="mt-1 text-sm text-red-600">{formErrors.apiUrl}</p>
-                    )}
-                    <p className="mt-1 text-xs text-gray-500">
-                      Formato: http://hostname:port/api/v1
-                    </p>
+                    {formErrors.apiUrl && formTouched.apiUrl && <p className="mt-1.5 text-sm text-rose-600">{formErrors.apiUrl}</p>}
+                    <p className="mt-1.5 text-xs text-slate-500">Formato: http://hostname:port/api/v1</p>
                   </div>
 
-                  {/* Username */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Username *
-                    </label>
+                    <label className={label}>Username *</label>
                     <input
                       type="text"
                       value={formData.username}
-                      onChange={(e) => handleFieldChange('username', e.target.value)}
+                      onChange={e => handleFieldChange('username', e.target.value)}
                       placeholder="Nome utente API"
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                        formErrors.username && formTouched.username
-                          ? 'border-red-500 focus:ring-red-500'
-                          : 'border-gray-300 focus:ring-blue-500'
-                      }`}
+                      className={`${inputBase} ${formErrors.username && formTouched.username ? inputError : inputNormal}`}
                     />
-                    {formErrors.username && formTouched.username && (
-                      <p className="mt-1 text-sm text-red-600">{formErrors.username}</p>
-                    )}
+                    {formErrors.username && formTouched.username && <p className="mt-1.5 text-sm text-rose-600">{formErrors.username}</p>}
                   </div>
 
-                  {/* Password */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Password *
-                    </label>
-                    <div className="relative">
+                    <label className={label}>Authorization scope *</label>
+                    <input
+                      type="text"
+                      value={formData.authScope}
+                      onChange={e => handleFieldChange('authScope', e.target.value)}
+                      placeholder="1"
+                      className={`${inputBase} ${formErrors.authScope && formTouched.authScope ? inputError : inputNormal}`}
+                    />
+                    {formErrors.authScope && formTouched.authScope && <p className="mt-1.5 text-sm text-rose-600">{formErrors.authScope}</p>}
+                    <p className="mt-1.5 text-xs text-slate-500">Numero identificativo dell&apos;ambiente, per esempio 1.</p>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className={label}>Password *</label>
+                    <div className="relative mt-2">
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={formData.password}
-                        onChange={(e) => handleFieldChange('password', e.target.value)}
+                        onChange={e => handleFieldChange('password', e.target.value)}
                         placeholder="Password API"
-                        className={`w-full px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-2 ${
-                          formErrors.password && formTouched.password
-                            ? 'border-red-500 focus:ring-red-500'
-                            : 'border-gray-300 focus:ring-blue-500'
-                        }`}
+                        className={`${inputBase} pr-12 ${formErrors.password && formTouched.password ? inputError : inputNormal}`}
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                        className="absolute inset-y-0 right-0 flex items-center px-4 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-700"
                       >
-                        {showPassword ? '🙈' : '👁️'}
+                        {showPassword ? 'Nascondi' : 'Mostra'}
                       </button>
                     </div>
-                    {formErrors.password && formTouched.password && (
-                      <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
-                    )}
+                    {formErrors.password && formTouched.password && <p className="mt-1.5 text-sm text-rose-600">{formErrors.password}</p>}
                     {editingServer && formData.password === '••••••••' && (
-                      <p className="mt-1 text-xs text-gray-500">
-                        Password già configurata. Inserisci una nuova password per cambiarla.
+                      <p className="mt-1.5 text-xs text-slate-500">
+                        Password gia configurata. Inserisci una nuova password per modificarla.
                       </p>
                     )}
                   </div>
-
-                  {/* Auth Scope */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Authorization Scope *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.authScope}
-                      onChange={(e) => handleFieldChange('authScope', e.target.value)}
-                      placeholder="1"
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
-                        formErrors.authScope && formTouched.authScope
-                          ? 'border-red-500 focus:ring-red-500'
-                          : 'border-gray-300 focus:ring-blue-500'
-                      }`}
-                    />
-                    {formErrors.authScope && formTouched.authScope && (
-                      <p className="mt-1 text-sm text-red-600">{formErrors.authScope}</p>
-                    )}
-                    <p className="mt-1 text-xs text-gray-500">
-                      Numero identificativo dell'ambiente (es. 1)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex gap-3 justify-end">
-                  <button
-                    onClick={cancelServerForm}
-                    disabled={saving}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 disabled:opacity-50 transition-colors"
-                  >
-                    ❌ Annulla
-                  </button>
-                  <button
-                    onClick={handleSaveServer}
-                    disabled={saving || Object.values(formErrors).some(e => e)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-                  >
-                    {saving ? (
-                      <>
-                        <span className="animate-spin">⏳</span>
-                        Salvataggio...
-                      </>
-                    ) : (
-                      '💾 Salva Server'
-                    )}
-                  </button>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Modal conferma cambio server */}
-          {showSwitchConfirm && pendingSwitchServerId && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-                <h2 className="text-xl font-bold text-orange-600 mb-4">⚠️ Cambio Server Rilevato</h2>
-                <p className="text-gray-700 mb-4">
-                  Stai cambiando il server attivo da <strong>{activeServer?.name || 'Nessuno'}</strong> a 
-                  <strong> {config.servers.find(s => s.id === pendingSwitchServerId)?.name}</strong>.
-                </p>
-                <p className="text-gray-600 mb-4">
-                  Il cambio del server attivo richiede la <strong>cancellazione totale</strong> di:
-                </p>
-                <ul className="text-sm text-gray-600 mb-4 list-disc list-inside space-y-1">
-                  <li>Tutti i log di sincronizzazione (sync_jobs)</li>
-                  <li>Tutti i dati cache nel database SQL Server</li>
-                  <li>I metadati di sincronizzazione</li>
-                </ul>
-                <p className="text-red-600 font-semibold mb-6">
-                  ⚠️ QUESTA OPERAZIONE È IRREVERSIBILE!
-                </p>
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={cancelSwitchConfirmation}
-                    disabled={switching}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 disabled:opacity-50 transition-colors"
-                  >
-                    ❌ Annulla
-                  </button>
-                  <button
-                    onClick={() => handleSwitchServer(true)}
-                    disabled={switching}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
-                  >
-                    {switching ? (
-                      <>
-                        <span className="animate-spin">⏳</span>
-                        Cambio in corso...
-                      </>
-                    ) : (
-                      '✅ Conferma e Cancella Dati'
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Info server attivo + Test connessione */}
-          {activeServer && (
-            <div className="mb-6 p-4 bg-blue-50 rounded-md border border-blue-200">
-              <h3 className="text-sm font-medium text-blue-800 mb-2">
-                🟢 Server Attivo: {activeServer.name}
-              </h3>
-              <div className="text-sm text-blue-700 space-y-1">
-                <div><strong>URL:</strong> {activeServer.apiUrl}</div>
-                <div><strong>Username:</strong> {activeServer.username}</div>
-                <div><strong>Auth Scope:</strong> {activeServer.authScope}</div>
-              </div>
-              
-              {/* Risultato test */}
-              {testResult && (
-                <div className={`mt-3 p-3 rounded-md ${
-                  testResult.success 
-                    ? 'bg-green-100 border border-green-200' 
-                    : 'bg-red-100 border border-red-200'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{testResult.success ? '✅' : '❌'}</span>
-                    <div>
-                      <div className={`font-medium ${testResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                        {testResult.success ? testResult.message : testResult.error}
-                      </div>
-                      {testResult.elapsedMs && (
-                        <div className="text-xs text-gray-600">
-                          Tempo: {testResult.elapsedMs}ms
-                        </div>
-                      )}
-                      {testResult.serverInfo && (
-                        <div className="text-xs text-gray-600">
-                          Licenza: {testResult.serverInfo.license} | Versione: {testResult.serverInfo.version}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <button
-                onClick={() => handleTest(false)}
-                disabled={testing || !config.configured}
-                className="mt-3 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-              >
-                {testing ? (
-                  <>
-                    <span className="animate-spin">⏳</span>
-                    Test in corso...
-                  </>
-                ) : (
-                  '🔌 Test Connessione'
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* Sezione cancellazione dati */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">⚠️ Manutenzione Database</h3>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={requestClearConfirmation}
-                disabled={clearing}
-                className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                🧹 Cancella Log e Database
-              </button>
-              {config.source === 'file' && config.servers.length > 0 && (
-                <button
-                  onClick={handleReset}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                >
-                  🗑️ Reset Configurazione
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-5 py-5 sm:flex-row sm:justify-end sm:px-6">
+                <button onClick={cancelServerForm} disabled={saving} className={`${btnBase} ${btnSecondary} w-full sm:w-auto`}>
+                  Annulla
                 </button>
-              )}
-            </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Cancella tutti i log delle sincronizzazioni precedenti e resetta il database SQL Server.
-              <strong className="text-orange-600"> Questa operazione è irreversibile!</strong>
-            </p>
-          </div>
-
-          {/* Modal di doppia conferma cancellazione */}
-          {showClearConfirm && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-                <h2 className="text-xl font-bold text-red-600 mb-4">⚠️ Conferma Cancellazione</h2>
-                <p className="text-gray-700 mb-4">
-                  Stai per cancellare <strong>tutti i log delle sincronizzazioni</strong> e 
-                  <strong> resettare completamente il database SQL Server</strong>.
-                </p>
-                <p className="text-gray-600 mb-4">
-                  Questa operazione eliminerà:
-                </p>
-                <ul className="text-sm text-gray-600 mb-4 list-disc list-inside space-y-1">
-                  <li>Tutti i job di sincronizzazione (sync_jobs)</li>
-                  <li>Tutti i dati cache clienti, fornitori, articoli, ordini</li>
-                  <li>I metadati di sincronizzazione</li>
-                </ul>
-                <p className="text-red-600 font-semibold mb-6">
-                  ⚠️ QUESTA OPERAZIONE È IRREVERSIBILE! Procedere?
-                </p>
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={cancelClearConfirmation}
-                    disabled={clearing}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 disabled:opacity-50 transition-colors"
-                  >
-                    ❌ Annulla
-                  </button>
-                  <button
-                    onClick={handleClearData}
-                    disabled={clearing}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
-                  >
-                    {clearing ? (
-                      <>
-                        <span className="animate-spin">⏳</span>
-                        Cancellazione...
-                      </>
-                    ) : (
-                      '✅ Conferma Cancellazione'
-                    )}
-                  </button>
-                </div>
+                <button
+                  onClick={handleSaveServer}
+                  disabled={saving || Object.values(formErrors).some(e => e)}
+                  className={`${btnBase} ${btnPrimary} w-full sm:w-auto`}
+                >
+                  {saving ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      Salvataggio in corso
+                    </>
+                  ) : (
+                    'Salva server'
+                  )}
+                </button>
               </div>
             </div>
-          )}
-
-          {/* Info box */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-md border border-gray-200">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">ℹ️ Informazioni</h3>
-            <ul className="text-xs text-gray-600 space-y-1">
-              <li>• La configurazione viene salvata in <code className="bg-gray-200 px-1 rounded">data/config.json</code></li>
-              <li>• Puoi salvare più server e cambiare il server attivo in qualsiasi momento</li>
-              <li>• <strong className="text-orange-600">Il cambio server attivo cancella automaticamente tutti i dati</strong></li>
-              <li>• Se non configurato, vengono usate le variabili ambiente</li>
-              <li>• Backup automatico in <code className="bg-gray-200 px-1 rounded">data/config.backup.json</code></li>
-              <li>• Log operazioni in <code className="bg-gray-200 px-1 rounded">data/operations.log</code></li>
-            </ul>
           </div>
+        )}
 
-          {/* Link torna alla home */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <Link href="/" className="text-blue-600 hover:text-blue-800 text-sm transition-colors">
-              ← Torna alla Home
-            </Link>
+        {/* Modal conferma cambio server */}
+        {showSwitchConfirm && pendingSwitchServerId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-[2rem] border border-amber-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.2)]">
+              <div className="border-b border-slate-200 px-5 py-5 sm:px-6">
+                <div className="flex items-start gap-3">
+                  <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-700">
+                    !
+                  </span>
+                  <div>
+                    <div className={label}>Cambio server</div>
+                    <h2 className="mt-1 text-2xl font-semibold text-slate-950">Conferma cambio server</h2>
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 py-5 sm:px-6">
+                <p className="text-sm leading-6 text-slate-700">
+                  Stai cambiando il server attivo da <strong>{activeServerName}</strong> a <strong>{pendingServerName}</strong>.
+                </p>
+                <p className="mt-4 text-sm leading-6 text-slate-600">Il cambio richiede la cancellazione totale di:</p>
+                <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>Tutti i log di sincronizzazione (sync_jobs)</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>Tutti i dati cache nel database SQL Server</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>I metadati di sincronizzazione</span>
+                  </li>
+                </ul>
+                <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                  Questa operazione e irreversibile.
+                </div>
+              </div>
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-5 py-5 sm:flex-row sm:justify-end sm:px-6">
+                <button onClick={cancelSwitchConfirmation} disabled={switching} className={`${btnBase} ${btnSecondary} w-full sm:w-auto`}>
+                  Annulla
+                </button>
+                <button onClick={() => handleSwitchServer(true)} disabled={switching} className={`${btnBase} ${btnDanger} w-full sm:w-auto`}>
+                  {switching ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      Cambio in corso
+                    </>
+                  ) : (
+                    'Conferma e cancella dati'
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Modal di doppia conferma cancellazione */}
+        {showClearConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-[2rem] border border-rose-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.2)]">
+              <div className="border-b border-slate-200 px-5 py-5 sm:px-6">
+                <div className="flex items-start gap-3">
+                  <span className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-sm font-semibold text-rose-700">
+                    x
+                  </span>
+                  <div>
+                    <div className={label}>Maintenance</div>
+                    <h2 className="mt-1 text-2xl font-semibold text-slate-950">Conferma cancellazione</h2>
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 py-5 sm:px-6">
+                <p className="text-sm leading-6 text-slate-700">
+                  Stai per cancellare <strong>tutti i log delle sincronizzazioni</strong> e resettare completamente il database SQL Server.
+                </p>
+                <p className="mt-4 text-sm leading-6 text-slate-600">Questa operazione elimina:</p>
+                <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>Tutti i job di sincronizzazione (sync_jobs)</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>Tutti i dati cache clienti, fornitori, articoli e ordini</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>I metadati di sincronizzazione</span>
+                  </li>
+                </ul>
+                <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                  Questa operazione e irreversibile.
+                </div>
+              </div>
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-5 py-5 sm:flex-row sm:justify-end sm:px-6">
+                <button onClick={cancelClearConfirmation} disabled={clearing} className={`${btnBase} ${btnSecondary} w-full sm:w-auto`}>
+                  Annulla
+                </button>
+                <button onClick={handleClearData} disabled={clearing} className={`${btnBase} ${btnDanger} w-full sm:w-auto`}>
+                  {clearing ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      Cancellazione in corso
+                    </>
+                  ) : (
+                    'Conferma cancellazione'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

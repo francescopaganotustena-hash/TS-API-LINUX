@@ -127,16 +127,16 @@ function TreeRow({
         className={cx(
           "group flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition",
           selected
-            ? "bg-teal-100 text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
-            : "hover:bg-slate-100/80 text-slate-700"
+            ? "bg-cyan-100/85 text-slate-900 ring-1 ring-cyan-200/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+            : "hover:bg-white text-slate-700"
         )}
         style={{ paddingLeft: `${depth * 22 + 12}px` }}
       >
         <span className="flex w-4 shrink-0 items-center justify-center text-slate-400">
-          {hasChildren ? (expanded ? "v" : ">") : "-"}
+          {hasChildren ? (expanded ? "⌄" : "›") : "·"}
         </span>
         <span className={cx("flex h-6 w-6 shrink-0 items-center justify-center rounded-lg", selected ? "bg-white" : "bg-slate-100")}>
-          <span className={cx("h-2.5 w-2.5 rounded-sm", selected ? "bg-teal-600" : "bg-slate-400")} />
+          <span className={cx("h-2.5 w-2.5 rounded-sm", selected ? "bg-cyan-600" : "bg-slate-400")} />
         </span>
 
         <div className="min-w-0 flex-1">
@@ -173,10 +173,7 @@ function TreeRow({
 
       {hasChildren && expanded && (
         <div className="relative">
-          <div
-            className="absolute left-[22px] top-0 h-full border-l border-slate-200"
-            aria-hidden="true"
-          />
+          <div className="absolute left-[22px] top-0 h-full border-l border-slate-200" aria-hidden="true" />
           <div className="space-y-1">
             {node.children!.map((child) => (
               <TreeRow
@@ -247,11 +244,11 @@ export function TreeExplorer({
   };
 
   return (
-    <section className={cx("flex h-full min-h-0 flex-col bg-slate-50", className)}>
-      <header className="border-b border-slate-200 bg-white px-6 py-5">
+    <section className={cx("flex h-full min-h-0 flex-col bg-[linear-gradient(180deg,#f5f9fc_0%,#f8fbfd_100%)]", className)}>
+      <header className="border-b border-slate-200/80 bg-white/90 px-6 py-5">
         <div className="flex items-start gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-teal-700">
-            <span className="text-lg font-semibold">+</span>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700 ring-1 ring-cyan-200">
+            <span className="text-lg font-semibold">◇</span>
           </div>
           <div className="min-w-0">
             <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
@@ -260,7 +257,7 @@ export function TreeExplorer({
         </div>
 
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <span className="text-slate-400">/</span>
+          <span className="text-slate-400">⌕</span>
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -270,7 +267,7 @@ export function TreeExplorer({
           <button
             type="button"
             onClick={() => setQuery("")}
-            className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
           >
             Clear
           </button>
@@ -294,14 +291,14 @@ export function TreeExplorer({
           </div>
         ) : (
           <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white px-6 text-center">
-            <div className="text-4xl text-slate-300">/</div>
+            <div className="text-4xl text-slate-300">⌕</div>
             <h3 className="mt-4 text-sm font-semibold text-slate-900">{emptyStateTitle}</h3>
             <p className="mt-2 max-w-sm text-sm text-slate-500">{emptyStateDescription}</p>
           </div>
         )}
       </div>
 
-      <footer className="flex items-center justify-between border-t border-slate-200 bg-white px-6 py-3 text-[11px] font-medium tracking-wide text-slate-500">
+      <footer className="flex items-center justify-between border-t border-slate-200 bg-white/90 px-6 py-3 text-[11px] font-medium tracking-wide text-slate-500">
         <span>{footerLeft ?? `${visibleCount} nodes`}</span>
         <span>{footerRight ?? "Explorer ready"}</span>
       </footer>

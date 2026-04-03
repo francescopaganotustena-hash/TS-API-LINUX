@@ -73,6 +73,56 @@ function formatDateTime(value?: string): string {
   return new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "medium" }).format(new Date(parsed));
 }
 
+function getSyncStatusMeta(status: SyncStatus) {
+  switch (status) {
+    case "running":
+      return {
+        label: "In corso",
+        badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+        dotClass: "bg-amber-500",
+      };
+    case "success":
+      return {
+        label: "Completato",
+        badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        dotClass: "bg-emerald-500",
+      };
+    case "failed":
+      return {
+        label: "Errore",
+        badgeClass: "border-rose-200 bg-rose-50 text-rose-700",
+        dotClass: "bg-rose-500",
+      };
+    default:
+      return {
+        label: "Pronto",
+        badgeClass: "border-slate-200 bg-slate-100 text-slate-600",
+        dotClass: "bg-slate-500",
+      };
+  }
+}
+
+function getJobStatusMeta(status?: string) {
+  const normalized = normalizeStatus(status);
+  const labelMap: Record<SyncStatus, string> = {
+    idle: "Pronto",
+    running: status === "queued" ? "In coda" : "In corso",
+    success: "Completato",
+    failed: status === "cancelled" ? "Annullato" : "Errore",
+  };
+
+  const base = getSyncStatusMeta(normalized);
+  return {
+    label: labelMap[normalized],
+    badgeClass: base.badgeClass,
+    dotClass: base.dotClass,
+  };
+}
+
+function clampProgress(value?: number): number {
+  return Math.max(0, Math.min(100, Math.round(Number(value ?? 0))));
+}
+
 async function parseJsonOrText<T>(response: Response): Promise<T | string | null> {
   const text = await response.text();
   if (!text) return null;
@@ -307,191 +357,316 @@ export default function SyncPage() {
   const effectiveOverlapHours = clampNumber(overlapHours, 1, 168);
   const selectedScopeResourceLabel =
     RESOURCE_OPTIONS.find((option) => option.value === syncScopeResource)?.label ?? syncScopeResource;
+  const syncStatusMeta = getSyncStatusMeta(status);
+  const activeJobsCount = history.filter((job) => job.status === "running" || job.status === "queued").length;
+  const completedJobsCount = history.filter((job) => normalizeStatus(job.status) === "success").length;
+  const failedJobsCount = history.filter((job) => normalizeStatus(job.status) === "failed").length;
+  const latestJob = historyRows[0];
 
   return (
-    <main className="min-h-screen p-3 md:p-6">
-      <div className="mx-auto max-w-[1200px] space-y-4">
-        <header className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold text-slate-950">Sincronizzazione</h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Monitora i job di sincronizzazione e avvia aggiornamenti manuali del database locale.
-              </p>
-              <p className="mt-2 text-xs text-slate-500">Ultima sincronizzazione completata: {formatDateTime(lastSyncedAt ?? undefined)}</p>
+    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.12),_transparent_34%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-3 py-4 text-slate-900 md:px-6 md:py-6">
+      <div className="mx-auto max-w-[1240px] space-y-4 md:space-y-6">
+        <header className="overflow-hidden rounded-[28px] border border-white/70 bg-white/80 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="grid gap-6 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:px-6 lg:py-6">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Sync dashboard
+                <span className={["h-2 w-2 rounded-full", syncStatusMeta.dotClass].join(" ")} />
+                {syncStatusMeta.label}
+              </div>
+              <div className="max-w-3xl space-y-3">
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Sincronizzazione</h1>
+                <p className="max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+                  Monitora i job, avvia aggiornamenti manuali e tieni sotto controllo la salute del database locale da
+                  un unico pannello operativo.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Ultimo update: {formatDateTime(lastSyncedAt ?? undefined)}</span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Job attivi: {activeJobsCount}</span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Completati: {completedJobsCount}</span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Errori: {failedJobsCount}</span>
+              </div>
             </div>
-            <Link
-              href="/"
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Torna alla home
-            </Link>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[360px] lg:grid-cols-1">
+              <div className="rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 text-white shadow-lg shadow-slate-950/10">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Stato attuale</p>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-semibold">{syncStatusMeta.label}</p>
+                    <p className="text-sm text-slate-300">{phase}</p>
+                  </div>
+                  <div className={["rounded-full border px-3 py-1 text-xs font-semibold", syncStatusMeta.badgeClass].join(" ")}>
+                    {clampProgress(progress)}%
+                  </div>
+                </div>
+              </div>
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50"
+              >
+                Torna alla home
+              </Link>
+            </div>
           </div>
         </header>
 
-        <SyncPanel
-          status={status}
-          phase={phase}
-          progress={progress}
-          processed={processed}
-          inserted={inserted}
-          updated={updated}
-          errors={errors}
-          message={message}
-          warning={warning}
-          lastSyncedAt={lastSyncedAt}
-          onSync={() => {
-            void startSync();
-          }}
-          onCancel={() => {
-            void cancelSync();
-          }}
-          disabled={isBusy || status === "running"}
-          cancelDisabled={isCancelling || status !== "running"}
-          title="Job sincronizzazione"
-          description="Questa pagina mostra lo stato reale del job, inclusa la barra di avanzamento."
-          actionLabel="Avvia nuova sincronizzazione"
-          cancelLabel={isCancelling ? "Annullamento..." : "Blocca sincronizzazione"}
-          contextSummary={
-            syncScope === "resource"
-              ? `Ambito: Singola risorsa | ${selectedScopeResourceLabel}`
-              : "Ambito: Tutto"
-          }
-          extraActions={
-            <div className="flex flex-wrap items-end gap-2">
-              <label className="flex min-w-[150px] flex-col gap-1">
-                <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Ambito
-                  <span
-                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold text-slate-500"
-                    title="Definisce QUANTO sincronizzare: tutto il database locale oppure una sola risorsa."
-                    aria-label="Aiuto ambito"
-                  >
-                    i
+        <section className="rounded-[28px] border border-white/70 bg-white/80 p-3 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur md:p-4">
+          <SyncPanel
+            status={status}
+            phase={phase}
+            progress={progress}
+            processed={processed}
+            inserted={inserted}
+            updated={updated}
+            errors={errors}
+            message={message}
+            warning={warning}
+            lastSyncedAt={lastSyncedAt}
+            onSync={() => {
+              void startSync();
+            }}
+            onCancel={() => {
+              void cancelSync();
+            }}
+            disabled={isBusy || status === "running"}
+            cancelDisabled={isCancelling || status !== "running"}
+            title="Job sincronizzazione"
+            description="Questa pagina mostra lo stato reale del job, inclusa la barra di avanzamento."
+            actionLabel="Avvia nuova sincronizzazione"
+            cancelLabel={isCancelling ? "Annullamento..." : "Blocca sincronizzazione"}
+            contextSummary={
+              syncScope === "resource"
+                ? `Ambito: Singola risorsa | ${selectedScopeResourceLabel}`
+                : "Ambito: Tutto"
+            }
+            extraActions={
+              <div className="grid w-full gap-3 lg:min-w-[780px] lg:grid-cols-4">
+                <label className="flex flex-col gap-1.5">
+                  <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Ambito
+                    <span
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold text-slate-500"
+                      title="Definisce QUANTO sincronizzare: tutto il database locale oppure una sola risorsa."
+                      aria-label="Aiuto ambito"
+                    >
+                      i
+                    </span>
                   </span>
-                </span>
-                <select
-                  value={syncScope}
-                  onChange={(event) => setSyncScope(event.target.value === "resource" ? "resource" : "full")}
-                  disabled={isBusy || status === "running"}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="full">Tutto</option>
-                  <option value="resource">Singola risorsa</option>
-                </select>
-              </label>
-              <label className="flex min-w-[170px] flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Risorsa</span>
-                <select
-                  value={syncScopeResource}
-                  onChange={(event) =>
-                    setSyncScopeResource(
-                      RESOURCE_OPTIONS.some((option) => option.value === event.target.value)
-                        ? (event.target.value as (typeof RESOURCE_OPTIONS)[number]["value"])
-                        : "clienti"
-                    )
-                  }
-                  disabled={isBusy || status === "running" || syncScope === "full"}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {RESOURCE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex min-w-[170px] flex-col gap-1">
-                <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Strategia sync
-                  <span
-                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold text-slate-500"
-                    title="Definisce COME sincronizzare: differenziale (solo variazioni) o ricarica completa."
-                    aria-label="Aiuto strategia sync"
+                  <select
+                    value={syncScope}
+                    onChange={(event) => setSyncScope(event.target.value === "resource" ? "resource" : "full")}
+                    disabled={isBusy || status === "running"}
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    i
-                  </span>
-                </span>
-                <select
-                  value={syncMode}
-                  onChange={(event) => setSyncMode(event.target.value === "full" ? "full" : "incremental")}
-                  disabled={isBusy || status === "running"}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="incremental">Differenziale</option>
-                  <option value="full">Ricarica completa</option>
-                </select>
-              </label>
-              <label className="flex min-w-[140px] flex-col gap-1">
-                <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Overlap ore
-                  <span
-                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold text-slate-500"
-                    title="Solo per differenziale: recupera anche le ultime ore per coprire ritardi/riinvii."
-                    aria-label="Aiuto overlap ore"
+                    <option value="full">Tutto</option>
+                    <option value="resource">Singola risorsa</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Risorsa</span>
+                  <select
+                    value={syncScopeResource}
+                    onChange={(event) =>
+                      setSyncScopeResource(
+                        RESOURCE_OPTIONS.some((option) => option.value === event.target.value)
+                          ? (event.target.value as (typeof RESOURCE_OPTIONS)[number]["value"])
+                          : "clienti"
+                      )
+                    }
+                    disabled={isBusy || status === "running" || syncScope === "full"}
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    i
+                    {RESOURCE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Strategia sync
+                    <span
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold text-slate-500"
+                      title="Definisce COME sincronizzare: differenziale (solo variazioni) o ricarica completa."
+                      aria-label="Aiuto strategia sync"
+                    >
+                      i
+                    </span>
                   </span>
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={168}
-                  step={1}
-                  value={effectiveOverlapHours}
-                  onChange={(event) => setOverlapHours(clampNumber(Number(event.target.value), 1, 168))}
-                  disabled={isBusy || status === "running" || syncMode === "full"}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </label>
-              <div className="max-w-[320px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
-                {syncScope === "resource"
-                  ? "Sync mirata sulla singola risorsa selezionata. Il backend puo comunque applicare fallback di sicurezza."
-                  : syncMode === "incremental"
-                    ? "Strategia differenziale: aggiorna solo le variazioni. Se manca una baseline affidabile, il backend puo passare a ricarica completa."
-                    : "Ricarica completa: utile per riallineamento totale o riconciliazione periodica."}
+                  <select
+                    value={syncMode}
+                    onChange={(event) => setSyncMode(event.target.value === "full" ? "full" : "incremental")}
+                    disabled={isBusy || status === "running"}
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="incremental">Differenziale</option>
+                    <option value="full">Ricarica completa</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Overlap ore
+                    <span
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] font-bold text-slate-500"
+                      title="Solo per differenziale: recupera anche le ultime ore per coprire ritardi/riinvii."
+                      aria-label="Aiuto overlap ore"
+                    >
+                      i
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={168}
+                    step={1}
+                    value={effectiveOverlapHours}
+                    onChange={(event) => setOverlapHours(clampNumber(Number(event.target.value), 1, 168))}
+                    disabled={isBusy || status === "running" || syncMode === "full"}
+                    className="h-11 rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </label>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[11px] leading-5 text-slate-500 lg:col-span-4">
+                  {syncScope === "resource"
+                    ? "Sync mirata sulla singola risorsa selezionata. Il backend puo comunque applicare fallback di sicurezza."
+                    : syncMode === "incremental"
+                      ? "Strategia differenziale: aggiorna solo le variazioni. Se manca una baseline affidabile, il backend puo passare a ricarica completa."
+                      : "Ricarica completa: utile per riallineamento totale o riconciliazione periodica."}
+                </div>
               </div>
-            </div>
-          }
-        />
+            }
+          />
+        </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">Storico ultimi job</h2>
+        <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/80 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 px-5 py-4 md:px-6">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Storico job</h2>
+              <p className="mt-1 text-sm text-slate-600">Ultimi dieci esiti registrati, con stato, fase e finestra temporale.</p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">Totale visualizzati: {historyRows.length}</span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">Ultimo ID: {latestJob?.id ?? latestJob?.jobId ?? "-"}</span>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+
+          <div className="hidden overflow-x-auto md:block">
+            <table className="min-w-full border-separate border-spacing-0 text-sm">
               <thead>
-                <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-4 py-3">ID</th>
-                  <th className="px-4 py-3">Stato</th>
-                  <th className="px-4 py-3">Fase</th>
-                  <th className="px-4 py-3">Progresso</th>
-                  <th className="px-4 py-3">Avvio</th>
-                  <th className="px-4 py-3">Fine</th>
+                <tr className="bg-slate-50/90 text-left text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  <th className="border-b border-slate-200/70 px-5 py-3 font-semibold">ID</th>
+                  <th className="border-b border-slate-200/70 px-5 py-3 font-semibold">Stato</th>
+                  <th className="border-b border-slate-200/70 px-5 py-3 font-semibold">Fase</th>
+                  <th className="border-b border-slate-200/70 px-5 py-3 font-semibold">Progresso</th>
+                  <th className="border-b border-slate-200/70 px-5 py-3 font-semibold">Avvio</th>
+                  <th className="border-b border-slate-200/70 px-5 py-3 font-semibold">Fine</th>
                 </tr>
               </thead>
               <tbody>
                 {historyRows.length > 0 ? (
-                  historyRows.map((job) => (
-                    <tr key={job.id ?? job.jobId} className="border-t border-slate-100 text-slate-700">
-                      <td className="px-4 py-3 font-mono text-xs">{job.id ?? job.jobId ?? "-"}</td>
-                      <td className="px-4 py-3">{job.status ?? "-"}</td>
-                      <td className="px-4 py-3">{job.phase ?? "-"}</td>
-                      <td className="px-4 py-3">{Math.max(0, Math.min(100, Math.round(Number(job.progressPct ?? 0))))}%</td>
-                      <td className="px-4 py-3">{formatDateTime(job.startedAt)}</td>
-                      <td className="px-4 py-3">{formatDateTime(job.endedAt)}</td>
-                    </tr>
-                  ))
+                  historyRows.map((job, index) => {
+                    const statusMeta = getJobStatusMeta(job.status);
+                    return (
+                      <tr
+                        key={job.id ?? job.jobId}
+                        className={[
+                          "transition-colors hover:bg-slate-50/80",
+                          index !== historyRows.length - 1 ? "border-b border-slate-100" : "",
+                        ].join(" ")}
+                      >
+                        <td className="px-5 py-4 font-mono text-xs text-slate-700">{job.id ?? job.jobId ?? "-"}</td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={["inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold", statusMeta.badgeClass].join(
+                              " "
+                            )}
+                          >
+                            <span className={["h-2 w-2 rounded-full", statusMeta.dotClass].join(" ")} />
+                            {statusMeta.label}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-slate-700">{job.phase ?? "-"}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-slate-900 via-slate-700 to-sky-600"
+                                style={{ width: `${clampProgress(job.progressPct)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-slate-600">{clampProgress(job.progressPct)}%</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-slate-600">{formatDateTime(job.startedAt)}</td>
+                        <td className="px-5 py-4 text-slate-600">{formatDateTime(job.endedAt)}</td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td className="px-4 py-4 text-slate-500" colSpan={6}>
+                    <td className="px-5 py-6 text-slate-500" colSpan={6}>
                       Nessun job registrato.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="grid gap-3 p-4 md:hidden">
+            {historyRows.length > 0 ? (
+              historyRows.map((job) => {
+                const statusMeta = getJobStatusMeta(job.status);
+                return (
+                  <article key={job.id ?? job.jobId} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Job</p>
+                        <p className="mt-1 truncate font-mono text-xs text-slate-700">{job.id ?? job.jobId ?? "-"}</p>
+                      </div>
+                      <span
+                        className={["inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold", statusMeta.badgeClass].join(
+                          " "
+                        )}
+                      >
+                        <span className={["h-2 w-2 rounded-full", statusMeta.dotClass].join(" ")} />
+                        {statusMeta.label}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 text-sm text-slate-600">
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-slate-500">Fase</span>
+                        <span className="text-right text-slate-800">{job.phase ?? "-"}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-slate-500">Progresso</span>
+                        <span className="text-right font-medium text-slate-800">{clampProgress(job.progressPct)}%</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-slate-500">Avvio</span>
+                        <span className="text-right text-slate-800">{formatDateTime(job.startedAt)}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-slate-500">Fine</span>
+                        <span className="text-right text-slate-800">{formatDateTime(job.endedAt)}</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-slate-900 via-slate-700 to-sky-600"
+                        style={{ width: `${clampProgress(job.progressPct)}%` }}
+                      />
+                    </div>
+                  </article>
+                );
+              })
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                Nessun job registrato.
+              </div>
+            )}
           </div>
         </section>
       </div>
