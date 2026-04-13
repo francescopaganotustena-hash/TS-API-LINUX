@@ -18,6 +18,7 @@ import {
   saveSyncJob,
   updateSyncMeta,
   writeLocalResource,
+  writeLocalResourceChunked,
 } from "./_syncStore";
 
 type SearchItem = {
@@ -55,6 +56,7 @@ const RESOURCE_SCOPE_JOB_PREFIX = "sync_resource";
 
 const DEFAULT_TIMEOUT_MS = 300_000;
 const DEFAULT_INCREMENTAL_OVERLAP_HOURS = 24;
+const BULK_FLUSH_EVERY_PAGES = 50;
 const cancellationRequests = new Set<string>();
 interface GestionaleHeadersOptions {
   authScope: string;
@@ -189,6 +191,8 @@ async function fetchGestionalePage(params: {
       pageNumber: params.pageNumber,
       pageSize: params.pageSize,
       extendedMode: true,
+      // In sync ordini evitiamo le chiamate dettaglio per-record: riduce drasticamente il tempo totale.
+      enrichRemoteDetails: mappedResource !== "ordini",
     });
     return response.data;
   }
@@ -247,9 +251,12 @@ async function fetchAllPages(params: {
   timeoutMs?: number;
   onProgress?: (pageNumber: number, rowsFetched: number) => Promise<void> | void;
   shouldCancel?: () => boolean;
+  flushEveryNPages?: number;
+  onFlushBatch?: (batch: Record<string, unknown>[]) => Promise<void>;
 }): Promise<Record<string, unknown>[]> {
   const rows: Record<string, unknown>[] = [];
   let reachedPageLimitWithPotentialMoreData = false;
+  const flushEvery = params.flushEveryNPages ?? 0;
 
   for (let pageNumber = 0; pageNumber < params.maxPages; pageNumber += 1) {
     if (params.shouldCancel?.()) {
@@ -275,6 +282,11 @@ async function fetchAllPages(params: {
     rows.push(...pageRows);
     await params.onProgress?.(pageNumber, rows.length);
 
+    if (flushEvery > 0 && params.onFlushBatch && rows.length >= flushEvery * params.pageSize) {
+      await params.onFlushBatch([...rows]);
+      rows.length = 0;
+    }
+
     if (pageRows.length < params.pageSize) {
       break;
     }
@@ -282,6 +294,11 @@ async function fetchAllPages(params: {
     if (pageNumber === params.maxPages - 1) {
       reachedPageLimitWithPotentialMoreData = true;
     }
+  }
+
+  if (flushEvery > 0 && params.onFlushBatch && rows.length > 0) {
+    await params.onFlushBatch([...rows]);
+    rows.length = 0;
   }
 
   if (reachedPageLimitWithPotentialMoreData) {
@@ -413,12 +430,24 @@ async function syncResourceFullPhase(params: {
   const entityName = ENTITY_MAP[resource];
   const filters: Record<string, string> = {};
   const modeLabel = params.modeLabel ?? "completa";
+  const syncTime = new Date().toISOString();
+  let totalWritten = 0;
+  let truncateDone = false;
 
   await updateJobProgress(params.jobId, {
     phase: resource,
     progressPct: getProgressByPhase(params.phaseIndex, params.phaseCount, 0),
     message: `Sincronizzazione ${modeLabel} ${getResourceLabel(resource)}...`,
   });
+
+  const onFlushBatch = async (batch: Record<string, unknown>[]) => {
+    if (!truncateDone) {
+      await writeLocalResourceChunked(resource, [], syncTime, "truncate");
+      truncateDone = true;
+    }
+    await writeLocalResourceChunked(resource, batch, syncTime, "append");
+    totalWritten += batch.length;
+  };
 
   const rows = await fetchAllPages({
     baseUrl: params.baseUrl,
@@ -434,28 +463,44 @@ async function syncResourceFullPhase(params: {
     password: params.password,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     shouldCancel: () => isCancellationRequested(params.jobId),
+    flushEveryNPages: BULK_FLUSH_EVERY_PAGES,
+    onFlushBatch,
     onProgress: async (pageNumber, totalRows) => {
       const phaseFraction = Math.min(0.9, (pageNumber + 1) / Math.max(1, params.config.maxPages));
       await updateJobProgress(params.jobId, {
         progressPct: getProgressByPhase(params.phaseIndex, params.phaseCount, phaseFraction),
-        processed: totalRows,
+        processed: totalWritten + totalRows,
         message: `Sincronizzazione ${modeLabel} ${getResourceLabel(resource)} pagina ${pageNumber + 1}`,
       });
     },
   });
 
   throwIfCancelled(params.jobId);
-  const snapshot = await writeLocalResource(resource, rows);
+
+  if (rows.length > 0) {
+    if (!truncateDone) {
+      const snapshot = await writeLocalResource(resource, rows);
+      totalWritten = snapshot.count;
+    } else {
+      await writeLocalResourceChunked(resource, rows, syncTime, "append");
+      totalWritten += rows.length;
+    }
+  } else if (!truncateDone) {
+    const snapshot = await writeLocalResource(resource, rows);
+    totalWritten = snapshot.count;
+  }
+
+  await writeLocalResourceChunked(resource, [], syncTime, "finalize");
 
   await updateJobProgress(params.jobId, {
-    processed: snapshot.count,
-    inserted: snapshot.count,
+    processed: totalWritten,
+    inserted: totalWritten,
     updated: 0,
     progressPct: getProgressByPhase(params.phaseIndex, params.phaseCount, 1),
-    message: `${getResourceLabel(resource)} sincronizzati (${modeLabel}): ${snapshot.count}`,
+    message: `${getResourceLabel(resource)} sincronizzati (${modeLabel}): ${totalWritten}`,
   });
 
-  return { count: snapshot.count };
+  return { count: totalWritten };
 }
 
 async function syncResourceIncrementalPhase(params: {

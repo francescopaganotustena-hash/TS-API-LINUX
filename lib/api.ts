@@ -149,6 +149,7 @@ export interface SearchParams {
   pageNumber?: number;
   pageSize?: number;
   extendedMode?: boolean;
+  enrichRemoteDetails?: boolean;
 }
 
 export interface DirectClientParams {
@@ -779,6 +780,7 @@ export async function fetchGestionaleData(params: SearchParams): Promise<ApiResp
     pageNumber = 0,
     pageSize = MIN_PAGE_SIZE,
     extendedMode = false,
+    enrichRemoteDetails = true,
   } = params;
   const normalizedPageSize = Math.max(MIN_PAGE_SIZE, pageSize || MIN_PAGE_SIZE);
   const hasUnsafeFilterValues = getResourceSearchFields(resourceType, true).some((field) => {
@@ -799,7 +801,9 @@ export async function fetchGestionaleData(params: SearchParams): Promise<ApiResp
     if (!direct) return { data: [] };
 
     let directRows = [direct];
-    directRows = await enrichRows(directRows, resourceType, ambiente, utente, azienda);
+    if (enrichRemoteDetails) {
+      directRows = await enrichRows(directRows, resourceType, ambiente, utente, azienda);
+    }
 
     // applichiamo eventuali filtri estesi/locali rimanenti sul singolo record
     const filtersWithoutCliFor = { ...filters };
@@ -817,7 +821,9 @@ export async function fetchGestionaleData(params: SearchParams): Promise<ApiResp
     if (!direct) return { data: [] };
 
     let directRows = [direct];
-    directRows = await enrichRows(directRows, resourceType, ambiente, utente, azienda);
+    if (enrichRemoteDetails) {
+      directRows = await enrichRows(directRows, resourceType, ambiente, utente, azienda);
+    }
 
     const filtersWithoutCode = { ...filters };
     delete filtersWithoutCode.codiceArticoloMG;
@@ -895,7 +901,9 @@ export async function fetchGestionaleData(params: SearchParams): Promise<ApiResp
     }
   }
 
-  rows = await enrichRows(rows, resourceType, ambiente, utente, azienda);
+  if (enrichRemoteDetails) {
+    rows = await enrichRows(rows, resourceType, ambiente, utente, azienda);
+  }
 
   if (extendedFilters.length > 0) {
       rows = applyExtendedLocalFilter(rows, extendedFilters);

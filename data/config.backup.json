@@ -1,0 +1,36 @@
+{
+  "servers": [
+    {
+      "id": "server_1775023469483_6733kjv",
+      "name": "TestStudio81",
+      "apiUrl": "http://miorouter.homeip.net:9080/api/v1",
+      "username": "webapiadmin",
+      "password": "default",
+      "authScope": "1",
+      "createdAt": "2026-04-01T06:04:29.483Z",
+      "updatedAt": "2026-04-01T07:25:00.000Z"
+    },
+    {
+      "id": "server_1775026659525_9lm1cc9",
+      "name": "Prova",
+      "apiUrl": "http://miorouter.homeip.net:9080/api/v1",
+      "username": "webapiadmin",
+      "password": "default",
+      "authScope": "1",
+      "createdAt": "2026-04-01T06:57:39.525Z",
+      "updatedAt": "2026-04-01T06:57:39.525Z"
+    },
+    {
+      "id": "server_1775138203841_luvboa0",
+      "name": "http://10.0.0.183:9080/api/v1",
+      "apiUrl": "http://10.0.0.183:9080/api/v1",
+      "username": "webapiadmin",
+      "password": "default",
+      "authScope": "1",
+      "createdAt": "2026-04-02T13:56:43.841Z",
+      "updatedAt": "2026-04-02T13:56:43.841Z"
+    }
+  ],
+  "activeServerId": "server_1775138203841_luvboa0",
+  "lastUpdated": "2026-04-13T06:49:20.347Z"
+}

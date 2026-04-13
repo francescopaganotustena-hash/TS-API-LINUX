@@ -44,6 +44,16 @@ export async function writeLocalResource(
   return sqlStore.writeLocalResource(resource, rows, syncTime);
 }
 
+export async function writeLocalResourceChunked(
+  resource: SyncResource,
+  rowBatch: Record<string, unknown>[],
+  syncTime: string,
+  mode: "truncate" | "append" | "finalize"
+): Promise<void> {
+  assertSqlServerProvider();
+  return sqlStore.writeLocalResourceChunked(resource, rowBatch, syncTime, mode);
+}
+
 export async function getLastSyncInfo(): Promise<SyncMeta> {
   assertSqlServerProvider();
   return sqlStore.getLastSyncInfo();

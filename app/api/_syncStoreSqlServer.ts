@@ -1087,6 +1087,62 @@ async function replaceResourceRows(resource: SyncResource, rows: Record<string, 
   });
 }
 
+async function truncateResourceTable(resource: SyncResource): Promise<void> {
+  const config = getResourceConfig(resource);
+  const sql = getSql();
+
+  await withReadyDb(async (connection) => {
+    const transaction = new sql.Transaction(connection);
+    await transaction.begin();
+
+    try {
+      await transaction.request().query(`DELETE FROM ${qualifiedName(SQLSERVER_SCHEMA, config.tableName)}`);
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback().catch(() => undefined);
+      throw error;
+    }
+  });
+}
+
+async function appendResourceRows(resource: SyncResource, rows: Record<string, unknown>[], syncTime: string): Promise<void> {
+  if (rows.length === 0) return;
+
+  const config = getResourceConfig(resource);
+  const sql = getSql();
+
+  await withReadyDb(async (connection) => {
+    const transaction = new sql.Transaction(connection);
+    await transaction.begin();
+
+    try {
+      const bulkTable = new sql.Table(qualifiedName(SQLSERVER_SCHEMA, config.tableName));
+      bulkTable.create = false;
+      for (const column of config.bulkColumns) {
+        bulkTable.columns.add(column.name, column.type(sql), { nullable: column.nullable ?? false });
+      }
+
+      for (const row of rows) {
+        const normalized = config.normalizeRow(row, syncTime);
+        const values: BulkCellValue[] = config.bulkColumns.map((column) => {
+          const value = normalized[column.name];
+          if (typeof value === "string" && column.maxLength) {
+            return normalizeBulkCellValue(truncateString(value, column.maxLength));
+          }
+          return normalizeBulkCellValue(value);
+        });
+        bulkTable.rows.add(...values);
+      }
+
+      await transaction.request().bulk(bulkTable);
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback().catch(() => undefined);
+      throw error;
+    }
+  });
+}
+
 async function readResourceMeta(resource: SyncResource): Promise<{ updatedAt: string | null; count: number }> {
   const rows = await runQuery<Record<string, unknown>>(
     `SELECT updated_at, row_count
@@ -1218,6 +1274,23 @@ export async function writeLocalResource(resource: SyncResource, rows: Record<st
   await upsertSyncMeta({ ...currentMeta, lastSyncAt: syncTime });
 
   return { resource, updatedAt: syncTime, count: rows.length, rows };
+}
+
+export async function writeLocalResourceChunked(
+  resource: SyncResource,
+  rowBatch: Record<string, unknown>[],
+  syncTime: string,
+  mode: "truncate" | "append" | "finalize"
+): Promise<void> {
+  if (mode === "truncate") {
+    await truncateResourceTable(resource);
+  } else if (mode === "append") {
+    await appendResourceRows(resource, rowBatch, syncTime);
+  } else if (mode === "finalize") {
+    await upsertResourceMeta(resource, syncTime, rowBatch.length > 0 ? rowBatch.length : 0);
+    const currentMeta = await getLastSyncInfo();
+    await upsertSyncMeta({ ...currentMeta, lastSyncAt: syncTime });
+  }
 }
 
 export async function getLastSyncInfo(): Promise<SyncMeta> {

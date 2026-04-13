@@ -38,7 +38,7 @@ const DEFAULT_CONTEXT: SearchContext = {
   utente: "TeamSa",
   azienda: "1",
   pageSize: 100,
-  maxPages: 5000,
+  maxPages: 1000,
 };
 
 const RESOURCE_META: Record<MainResource, { title: string; description: string; searchPlaceholder: string }> = {
@@ -84,9 +84,7 @@ function buildSearchFilters(resource: MainResource, rawQuery: string): Record<st
 
   if (resource === "ordini") {
     if (isNumeric) return { numdoc: query };
-    // FIX: Search by party name instead of document type when searching documents
-    // This allows filtering invoices/orders by customer/supplier company name
-    return { nomeParty: query };
+    return { tipodoc: query };
   }
 
   return {};
@@ -257,35 +255,23 @@ function getInitialDocumentClassFolders(parentId: string): TreeNode[] {
   ];
 }
 
-function filterDocsByOwnerCode(rows: Row[], ownerCode: string | null | undefined): Row[] {
-  const wanted = normalizePartyCode(ownerCode ?? undefined);
+function filterDocsByOwnerCode(rows: Row[], ownerCode: string): Row[] {
+  const wanted = normalizePartyCode(ownerCode);
   if (!wanted) return [];
 
-  // NOTE: Prioritize _cliForDest/_cliForFatt (injected INT columns from SQL) over
-  // raw_json variants to avoid mismatches from leading-zero stripping differences.
   return rows.filter((row) => {
     const codeCandidates = [
-      // Injected INT columns (reliable, no leading-zero issues)
-      row._cliForDest != null ? String(row._cliForDest) : null,
-      row._cliForFatt != null ? String(row._cliForFatt) : null,
-      // Raw JSON variants - various possible field names
-      asText(getByPath(row, "cliForDest")),
-      asText(getByPath(row, "clifordest")),
-      asText(getByPath(row, "cliForFatt")),
-      asText(getByPath(row, "cliforfatt")),
+      asText(getByPath(row, "_cliForFatt")),
+      asText(getByPath(row, "_cliForDest")),
       asText(getByPath(row, "clienteFornitoreMG.cliFor")),
+      asText(getByPath(row, "clienteFornitoreMG.idCliFor")),
+      asText(getByPath(row, "cliforfatt")),
+      asText(getByPath(row, "cliForFatt")),
+      asText(getByPath(row, "cliForDest")),
       asText(getByPath(row, "idCliFor")),
       asText(getByPath(row, "cliFor")),
-      asText(getByPath(row, "clifor")),
-      // Also check nested paths that might contain the code
-      asText(getByPath(row, "anagrafica.cliFor")),
-      asText(getByPath(row, "anagrafica.codice")),
-      asText(getByPath(row, "clienteFornitoreMG.id")),
-      asText(getByPath(row, "clienteFornitoreMG.codice")),
-      asText(getByPath(row, "destinatari.cliFor")),
-      asText(getByPath(row, "destinatari.codice")),
     ];
-    return codeCandidates.some((code) => normalizePartyCode(code ?? undefined) === wanted);
+    return codeCandidates.some((code) => normalizePartyCode(code) === wanted);
   });
 }
 
@@ -393,31 +379,11 @@ function normalizeDocumentNodes(nodes: TreeNode[]): TreeNode[] {
 }
 
 function resolvePartyCode(row: Row): string | undefined {
-  // FIX: Prioritize _cliForFatt/_cliForDest (injected INT columns from SQL) over raw JSON
-  // to avoid showing incorrect party names from string fields like "APO"
-  // Also prioritize cliforfatt over cliForDest for invoices (fatture have supplier in cliForFatt)
-  
-  // Injected INT columns (reliable, from SQL sync)
-  if (row._cliForFatt != null) return String(row._cliForFatt);
-  if (row._cliForDest != null) return String(row._cliForDest);
-  
-  // Raw JSON fields - use cliforfatt first (supplier for invoices)
-  const cliforfatt = asText(getByPath(row, "cliforfatt"));
-  if (cliforfatt) return cliforfatt;
-  
-  const cliForFatt = asText(getByPath(row, "cliForFatt"));
-  if (cliForFatt) return cliForFatt;
-  
-  // Then clienteFornitoreMG.cliFor (the actual party linked to the document)
-  const mgCliFor = asText(getByPath(row, "clienteFornitoreMG.cliFor"));
-  if (mgCliFor) return mgCliFor;
-  
-  // cliForDest is often a destination code string like "APO", not a party code - use with caution
-  // Only return it if it looks like a numeric code
-  const cliForDest = asText(getByPath(row, "cliForDest"));
-  if (cliForDest && /^\d+$/.test(cliForDest)) return cliForDest;
-  
-  return undefined;
+  return (
+    asText(getByPath(row, "cliforfatt")) ??
+    asText(getByPath(row, "cliForDest")) ??
+    asText(getByPath(row, "clienteFornitoreMG.cliFor"))
+  );
 }
 
 function resolvePartyName(row: Row): string | undefined {
@@ -690,8 +656,7 @@ export default function Home() {
   const [loadedDocumentsFor, setLoadedDocumentsFor] = useState<string[]>([]);
   const [loadedDestinatariFor, setLoadedDestinatariFor] = useState<string[]>([]);
   const [loadedRowsFor, setLoadedRowsFor] = useState<string[]>([]);
-  // Per-party orders cache: key = normalized ownerCode, value = rows for that party
-  const ordersCacheByParty = useRef<Map<string, Row[]>>(new Map());
+  const allOrdersCacheRef = useRef<Row[] | null>(null);
   const partyNameByCode = useMemo(() => buildPartyNameIndex(dataByResource), [dataByResource]);
 
   const activeMeta = RESOURCE_META[activeResource];
@@ -813,8 +778,6 @@ export default function Home() {
       setLoadedDocumentsFor([]);
       setLoadedDestinatariFor([]);
       setLoadedRowsFor([]);
-      // Clear per-party orders cache when switching resource tabs
-      ordersCacheByParty.current.clear();
       void loadResource(activeResource, buildSearchFilters(activeResource, searchQuery));
     }, 350);
 
@@ -872,17 +835,16 @@ export default function Home() {
           pageSize: searchContext.pageSize,
         };
         const docsPageSize = 500;
-        const targetedFilters: Record<string, string> =
+        const targetedFilters =
           activeResource === "fornitori"
             ? { cliforfatt: ownerCode }
             : { clifordest: ownerCode };
-
 
         const getTargetedOrders = async (): Promise<Row[]> =>
           fetchAllPages(
             {
               ...baseOrderRequest,
-              filters: { ...targetedFilters },
+              filters: targetedFilters,
               extendedMode: false,
               pageSize: docsPageSize,
             },
@@ -892,12 +854,26 @@ export default function Home() {
         const getTargetedOrdersFirstPage = async (): Promise<Row[]> =>
           fetchLocalRows({
             ...baseOrderRequest,
-            filters: { ...targetedFilters },
+            filters: targetedFilters,
             extendedMode: false,
             pageNumber: 0,
             pageSize: docsPageSize,
           });
 
+        const getAllOrders = async (): Promise<Row[]> => {
+          if (allOrdersCacheRef.current !== null && allOrdersCacheRef.current.length > 0) return allOrdersCacheRef.current;
+          const allDocs = await fetchAllPages(
+            {
+              ...baseOrderRequest,
+              filters: {},
+              extendedMode: false,
+              pageSize: docsPageSize,
+            },
+            searchContext.maxPages
+          );
+          if (allDocs.length > 0) allOrdersCacheRef.current = allDocs;
+          return allDocs;
+        };
 
         let docs: Row[] = [];
         try {
@@ -906,18 +882,18 @@ export default function Home() {
           try {
             docs = await getTargetedOrdersFirstPage();
           } catch {
+            // ignore, fallback to getAllOrders below
+          }
+        }
+        if (docs.length === 0) {
+          try {
+            const allDocs = await getAllOrders();
+            docs = filterDocsByOwnerCode(allDocs, ownerCode);
+          } catch {
             docs = [];
           }
         }
-        // NOTE: removed fallback to getAllOrders() on empty docs.
-        // If a customer has no orders, we show 0, not all orders from cache.
-
-
         docs = dedupeDocs(docs);
-
-        // FIX: Apply client-side filtering to ensure documents belong to the selected owner
-        // This prevents showing invoices/orders from other customers due to API filter mismatches
-        docs = filterDocsByOwnerCode(docs, ownerCode);
 
         const classFolders =
           docs.length > 0
@@ -976,15 +952,7 @@ export default function Home() {
           return patched;
         });
 
-        setExpandedIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(partyRootId);
-          newSet.add(groupId);
-          for (const id of collectExpandableIds(classFolders)) {
-            newSet.add(id);
-          }
-          return Array.from(newSet);
-        });
+        setExpandedIds((prev) => Array.from(new Set([...prev, partyRootId, groupId, ...collectExpandableIds(classFolders)])));
         setLoadedDocumentsFor((prev) => [...prev, partyRootId]);
         return;
       }
@@ -1168,24 +1136,9 @@ export default function Home() {
   const rootCount = dataByResource[activeResource]?.length ?? treeNodes.length;
 
   return (
-    <main className="min-h-screen p-3 md:p-5">
-      <div className="mx-auto h-[calc(100vh-1.5rem)] max-w-[1680px] overflow-hidden rounded-[24px] border border-slate-300/80 bg-[linear-gradient(165deg,rgba(255,255,255,0.88),rgba(236,246,253,0.92))] shadow-[0_30px_80px_rgba(15,23,42,0.16)] backdrop-blur-sm md:h-[calc(100vh-2.5rem)]">
-        <div className="flex h-[62px] items-center justify-between border-b border-cyan-200/70 bg-[linear-gradient(90deg,#0f172a_0%,#0f2b3f_55%,#155e75_100%)] px-5 text-cyan-50">
-          <div className="flex items-center gap-3">
-            <span className="rounded-md border border-cyan-100/30 bg-cyan-200/15 px-2 py-1 text-[10px] font-semibold tracking-[0.14em]">NUOVA UI</span>
-            <span className="text-sm font-semibold tracking-[0.08em]">TS-API PORTAL RESTYLING</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <a
-              href="/config"
-              className="rounded-lg border border-cyan-100/30 bg-cyan-200/15 px-3 py-1.5 text-xs font-semibold text-cyan-50 transition hover:bg-cyan-200/30"
-            >
-              Settings
-            </a>
-            <span className="mono text-[11px] text-cyan-100/90">Build grafica 2026.04</span>
-          </div>
-        </div>
-        <div className="grid h-[calc(100%-62px)] grid-cols-1 md:grid-cols-[272px_minmax(0,1fr)] xl:grid-cols-[272px_minmax(0,1fr)_360px]">
+    <main className="min-h-screen p-2 md:p-4">
+      <div className="mx-auto h-[calc(100vh-1rem)] max-w-[1600px] overflow-hidden rounded-2xl border border-slate-300 bg-slate-100 shadow-[0_20px_60px_rgba(15,23,42,0.16)] md:h-[calc(100vh-2rem)]">
+        <div className="grid h-full grid-cols-1 md:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,1fr)_330px]">
           <ResourceSidebar
             resources={sidebarResources}
             activeResourceId={activeResource}
@@ -1210,15 +1163,9 @@ export default function Home() {
             className="h-full"
           />
 
-          <section className="flex min-h-0 flex-col border-r border-slate-200/80 bg-white/60">
-            <header className="h-14 border-b border-slate-200/80 bg-white/90 px-5 text-xs text-slate-500 flex items-center justify-between mono">
-              <span className="tracking-wide text-slate-600">TS-API EXPLORER</span>
-              <a
-                href="/config"
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
-              >
-                <span>Settings</span>
-              </a>
+          <section className="flex min-h-0 flex-col border-r border-slate-200">
+            <header className="h-11 border-b border-slate-200 bg-white px-4 text-xs text-slate-500 flex items-center mono">
+              TS-API Explorer
             </header>
 
             {error && (
@@ -1247,8 +1194,8 @@ export default function Home() {
                     ? "Sto recuperando i dati dal gestionale..."
                     : "Prova un filtro diverso o cambia risorsa dal menu a sinistra."
                 }
-                footerLeft={`${rootCount} ${activeMeta.title.toLowerCase()} | Alyante API v1`}
-                footerRight={`Ambiente ${searchContext.ambiente} | ${searchContext.utente}`}
+                footerLeft={`${rootCount} ${activeMeta.title.toLowerCase()} • Alyante API v1`}
+                footerRight={`Ambiente ${searchContext.ambiente} • ${searchContext.utente}`}
                 className="h-full"
               />
             </div>
@@ -1302,3 +1249,5 @@ export default function Home() {
     </main>
   );
 }
+
+

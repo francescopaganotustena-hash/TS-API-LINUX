@@ -25,7 +25,7 @@ const DEFAULT_CONTEXT = {
 };
 const ON_DEMAND_ATTACH_WAIT_MS = Number(process.env.SYNC_ON_DEMAND_ATTACH_WAIT_MS ?? "3000");
 const ON_DEMAND_PAGE_SIZE = Number(process.env.SYNC_ON_DEMAND_PAGE_SIZE ?? "100");
-const ON_DEMAND_MAX_PAGES = Number(process.env.SYNC_ON_DEMAND_MAX_PAGES ?? "1000");
+const ON_DEMAND_MAX_PAGES = Number(process.env.SYNC_ON_DEMAND_MAX_PAGES ?? "5000");
 const ON_DEMAND_LOCK_TTL_MS = Number(process.env.SYNC_ON_DEMAND_LOCK_TTL_MS ?? "30000");
 
 const RESOURCE_TTL_MS: Record<SyncResource, number> = {
@@ -134,6 +134,12 @@ async function fetchAllRemoteRows(params: {
 
     if (response.data.length < params.pageSize) {
       break;
+    }
+
+    if (pageNumber === params.maxPages - 1) {
+      console.warn(
+        `ON_DEMAND_TRUNCATION: ${params.resource} reached maxPages=${params.maxPages} with full page, data may be incomplete. Increase SYNC_ON_DEMAND_MAX_PAGES.`
+      );
     }
   }
 

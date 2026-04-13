@@ -39,7 +39,7 @@ const DEFAULT_CONTEXT = {
   utente: "TeamSa",
   azienda: "1",
   pageSize: 100,
-  maxPages: 1000,
+  maxPages: 5000,
 };
 
 type SyncMode = "incremental" | "full";

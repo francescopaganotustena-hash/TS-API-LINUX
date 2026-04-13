@@ -6,7 +6,7 @@ import { isSyncResource, type SyncScope } from "../../_syncTypes";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_PAGE_SIZE = 100;
-const DEFAULT_MAX_PAGES = 1000;
+const DEFAULT_MAX_PAGES = 5000;
 const DEFAULT_SYNC_MODE = "full";
 const DEFAULT_OVERLAP_HOURS = 24;
 const ACTIVE_JOB_STALE_MS = 10 * 60 * 1000;
